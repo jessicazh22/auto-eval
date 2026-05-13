@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { FlaskConical, FileText } from "lucide-react";
+import { FlaskConical, FileText, Sparkles } from "lucide-react";
 
 export default function Sidebar() {
   const location = useLocation();
@@ -25,6 +25,17 @@ export default function Sidebar() {
         >
           <FileText className="w-4 h-4" />
           Prompts
+        </Link>
+        <Link
+          to="/generate-rubric"
+          className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
+            isActive("/generate-rubric")
+              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+              : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          Generate Rubric
         </Link>
       </nav>
 
