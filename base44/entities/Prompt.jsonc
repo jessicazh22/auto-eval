@@ -8,11 +8,25 @@
     },
     "prompt_text": {
       "type": "string",
-      "description": "The full prompt text"
+      "description": "URL to the uploaded prompt text file"
+    },
+    "attached_files": {
+      "type": "array",
+      "description": "List of attached files with name and url",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "required": [
-    "name",
-    "prompt_text"
+    "name"
   ]
 }

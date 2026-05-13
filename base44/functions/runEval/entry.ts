@@ -26,6 +26,16 @@ Deno.serve(async (req) => {
     const prompt = prompts[0];
     if (!prompt) throw new Error('Prompt not found');
 
+    // Fetch prompt text (stored as file URL)
+    let promptText = prompt.prompt_text || '';
+    if (promptText.startsWith('http')) {
+      const res = await fetch(promptText);
+      promptText = await res.text();
+    }
+
+    // Collect attached file URLs for vision/context
+    const attachedFileUrls = (prompt.attached_files || []).map(f => f.url);
+
     // Load rubric and criteria
     const rubrics = await base44.asServiceRole.entities.Rubric.filter({ prompt_id: prompt.id });
     const rubric = rubrics[0];
@@ -48,16 +58,17 @@ Deno.serve(async (req) => {
 
     for (const result of results) {
       // Call 1: Generate output
-      const generatePrompt = `You are completing a task. Follow the instructions in the prompt exactly.\n\n${prompt.prompt_text}\n\nInput: ${result.test_input}`;
+      const generatePrompt = `You are completing a task. Follow the instructions in the prompt exactly.\n\n${promptText}\n\nInput: ${result.test_input}`;
       const rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt: generatePrompt,
+        ...(attachedFileUrls.length > 0 ? { file_urls: attachedFileUrls } : {}),
       });
 
       // Call 2: Score output against all criteria
       const criteriaList = criteria.map(c => `- ${c.name}: ${c.description}`).join('\n');
       const scorePrompt = `You are an evaluator. Score the output below against each criterion listed. Return JSON only, no other text.
 
-Prompt used: ${prompt.prompt_text}
+Prompt used: ${promptText}
 
 Input: ${result.test_input}
 
