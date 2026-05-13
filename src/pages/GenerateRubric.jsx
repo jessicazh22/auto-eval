@@ -5,18 +5,29 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Paperclip, X, Loader2, Sparkles, ArrowLeft, Check } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft, Check } from "lucide-react";
 import GeneratedRubricEditor from "@/components/rubric/GeneratedRubricEditor";
+import ExampleAnnotator from "@/components/rubric/ExampleAnnotator";
+
+const TABS = [
+  { id: "examples", label: "From Examples", description: "Annotate specific outputs to show what's good or bad" },
+  { id: "general", label: "General Description", description: "Describe what great output looks like in your own words" },
+];
 
 export default function GenerateRubric() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const fileInputRef = useRef(null);
 
+  const [activeTab, setActiveTab] = useState("examples");
   const [selectedPromptId, setSelectedPromptId] = useState("");
+
+  // Examples mode state
+  const [examples, setExamples] = useState([{ text: "", file: null, annotation: "" }]);
+
+  // General mode state
   const [feedbackText, setFeedbackText] = useState("");
-  const [uploadedFiles, setUploadedFiles] = useState([]); // [{name, url}]
-  const [uploadingFiles, setUploadingFiles] = useState(false);
+
+  // Shared result state
   const [generating, setGenerating] = useState(false);
   const [generatedCriteria, setGeneratedCriteria] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -27,34 +38,33 @@ export default function GenerateRubric() {
     queryFn: () => base44.entities.Prompt.list("-created_date"),
   });
 
-  const handleFileUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    setUploadingFiles(true);
-    const uploaded = await Promise.all(
-      files.map(async (f) => {
-        const { file_url } = await base44.integrations.Core.UploadFile({ file: f });
-        return { name: f.name, url: file_url };
-      })
-    );
-    setUploadedFiles((prev) => [...prev, ...uploaded]);
-    setUploadingFiles(false);
-    e.target.value = "";
-  };
-
-  const handleRemoveFile = (index) => {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
   const handleGenerate = async () => {
     if (!selectedPromptId) return;
     setGenerating(true);
     setGeneratedCriteria(null);
     setSaved(false);
+
+    let feedback_text = "";
+    let file_urls = [];
+
+    if (activeTab === "examples") {
+      const parts = examples
+        .filter((e) => e.text || e.file || e.annotation)
+        .map((e, i) => {
+          const content = e.file ? `[Attached file: ${e.file.name}]` : e.text || "(no content)";
+          const comment = e.annotation || "(no comment)";
+          return `Example ${i + 1}:\nOutput: ${content}\nFeedback: ${comment}`;
+        });
+      feedback_text = parts.join("\n\n");
+      file_urls = examples.filter((e) => e.file?.url).map((e) => e.file.url);
+    } else {
+      feedback_text = feedbackText;
+    }
+
     const res = await base44.functions.invoke("generateRubric", {
       prompt_id: selectedPromptId,
-      feedback_text: feedbackText,
-      file_urls: uploadedFiles.map((f) => f.url),
+      feedback_text,
+      file_urls,
     });
     setGeneratedCriteria(res.data.criteria || []);
     setGenerating(false);
@@ -62,18 +72,14 @@ export default function GenerateRubric() {
 
   const handleSave = async (criteria) => {
     setSaving(true);
-    // Get or create rubric for prompt
     const rubrics = await base44.entities.Rubric.filter({ prompt_id: selectedPromptId });
     let rubric = rubrics[0];
     if (!rubric) {
       rubric = await base44.entities.Rubric.create({ prompt_id: selectedPromptId, passing_threshold: 70 });
     } else {
-      // Delete existing criteria
       const existing = await base44.entities.RubricCriterion.filter({ rubric_id: rubric.id });
       await Promise.all(existing.map((c) => base44.entities.RubricCriterion.delete(c.id)));
     }
-
-    // Create new criteria
     await Promise.all(
       criteria.map((c) =>
         base44.entities.RubricCriterion.create({
@@ -84,15 +90,19 @@ export default function GenerateRubric() {
         })
       )
     );
-
     queryClient.invalidateQueries({ queryKey: ["criteria"] });
     queryClient.invalidateQueries({ queryKey: ["rubric", selectedPromptId] });
     setSaving(false);
     setSaved(true);
   };
 
+  const canGenerate = !!selectedPromptId && (
+    activeTab === "general" ? !!feedbackText.trim() :
+    examples.some((e) => e.text || e.file)
+  );
+
   return (
-    <div className="p-8 max-w-3xl mx-auto space-y-8">
+    <div className="p-8 max-w-5xl mx-auto space-y-8">
       <button
         onClick={() => navigate("/")}
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -104,16 +114,19 @@ export default function GenerateRubric() {
       <div>
         <h1 className="text-2xl font-semibold">Generate Rubric</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Select a prompt, provide feedback or examples, and let AI generate evaluation criteria for you.
+          Let AI generate evaluation criteria based on your inputs.
         </p>
       </div>
 
-      {/* Step 1: Select Prompt */}
-      <section className="space-y-3">
-        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">1. Select Prompt</h2>
-        <Select value={selectedPromptId} onValueChange={(v) => { setSelectedPromptId(v); setGeneratedCriteria(null); setSaved(false); }}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Choose a prompt..." />
+      {/* Prompt selector */}
+      <section className="space-y-2">
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Prompt</label>
+        <Select
+          value={selectedPromptId}
+          onValueChange={(v) => { setSelectedPromptId(v); setGeneratedCriteria(null); setSaved(false); }}
+        >
+          <SelectTrigger className="w-full max-w-sm">
+            <SelectValue placeholder="Select a prompt..." />
           </SelectTrigger>
           <SelectContent>
             {prompts.map((p) => (
@@ -123,67 +136,60 @@ export default function GenerateRubric() {
         </Select>
       </section>
 
-      {/* Step 2: Feedback */}
-      <section className="space-y-3">
-        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">2. Describe your expectations</h2>
+      {/* Mode tabs */}
+      <div className="border-b border-border">
+        <div className="flex gap-0">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setGeneratedCriteria(null); setSaved(false); }}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? "border-foreground text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tab description */}
+      <p className="text-sm text-muted-foreground -mt-4">
+        {TABS.find((t) => t.id === activeTab)?.description}
+      </p>
+
+      {/* Tab content */}
+      {activeTab === "examples" ? (
+        <ExampleAnnotator examples={examples} onChange={setExamples} />
+      ) : (
         <Textarea
           value={feedbackText}
           onChange={(e) => setFeedbackText(e.target.value)}
           placeholder="Describe what a good output looks like, what you want to avoid, specific qualities that matter, etc."
-          className="min-h-[140px] text-sm resize-y"
+          className="min-h-[160px] text-sm resize-y"
         />
+      )}
 
-        {/* File uploads */}
-        <div className="space-y-2">
-          {uploadedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {uploadedFiles.map((f, i) => (
-                <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-muted rounded-md text-xs text-muted-foreground">
-                  <Paperclip className="w-3 h-3" />
-                  <span className="max-w-[160px] truncate">{f.name}</span>
-                  <button onClick={() => handleRemoveFile(i)} className="hover:text-destructive transition-colors ml-1">
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingFiles}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-          >
-            {uploadingFiles ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
-            {uploadingFiles ? "Uploading..." : "Attach example outputs or reference files"}
-          </button>
-          <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
-        </div>
-      </section>
-
-      {/* Generate Button */}
-      <Button
-        onClick={handleGenerate}
-        disabled={!selectedPromptId || generating}
-        className="gap-2 w-full sm:w-auto"
-      >
+      {/* Generate button */}
+      <Button onClick={handleGenerate} disabled={!canGenerate || generating} className="gap-2">
         {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
         {generating ? "Generating rubric..." : "Generate Rubric"}
       </Button>
 
-      {/* Step 3: Review & Save */}
+      {/* Generated rubric */}
       {generatedCriteria && (
-        <section className="space-y-3">
-          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">3. Review & save</h2>
+        <section className="space-y-4 pt-2 border-t border-border">
+          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Review & Edit</h2>
           <GeneratedRubricEditor criteria={generatedCriteria} onChange={setGeneratedCriteria} />
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex items-center gap-3">
             <Button onClick={() => handleSave(generatedCriteria)} disabled={saving || saved} className="gap-2">
               {saving ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
               ) : saved ? (
                 <><Check className="w-4 h-4" /> Saved!</>
-              ) : (
-                "Save Rubric"
-              )}
+              ) : "Save Rubric"}
             </Button>
             {saved && (
               <button
