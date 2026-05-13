@@ -1,17 +1,20 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Paperclip, X, Loader2, Plus, Trash2, Maximize2, Minimize2 } from "lucide-react";
+import { Paperclip, X, Loader2, Plus, Trash2, Maximize2, Minimize2, Check } from "lucide-react";
 
-function ExampleSplitView({ example, onChange, fileInputRef, uploading, isImage, onAttachClick }) {
+function ExampleSplitView({ example, onChange, fileInputRef, uploading, isImage, onAttachClick, saved }) {
   return (
     <div className="grid grid-cols-2 divide-x divide-border h-full">
       {/* Left: Asset / Output viewer */}
       <div className="flex flex-col min-h-0">
         <div className="px-4 py-2.5 border-b border-border bg-muted/20 flex items-center justify-between shrink-0">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Output / Asset</p>
-          {!example.file ? (
+          <div className="flex items-center gap-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Output / Asset</p>
+              {saved && <span className="flex items-center gap-1 text-xs text-green-600"><Check className="w-3 h-3" /> Saved</span>}
+            </div>
+            {!example.file ? (
             <button
               onClick={onAttachClick}
               disabled={uploading}
@@ -22,7 +25,7 @@ function ExampleSplitView({ example, onChange, fileInputRef, uploading, isImage,
             </button>
           ) : (
             <button
-              onClick={() => onChange({ ...example, file: null })}
+              onClick={() => onChange({ ...example, file: null, text: "" })}
               className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
             >
               <X className="w-3 h-3" /> Remove
@@ -74,13 +77,22 @@ function ExamplePair({ example, index, onChange, onRemove }) {
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const saveTimerRef = useRef(null);
+
+  const handleChange = useCallback((updated) => {
+    onChange(updated);
+    setSaved(false);
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => setSaved(true), 600);
+  }, [onChange]);
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
     const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    onChange({ ...example, file: { name: file.name, url: file_url, type: file.type } });
+    handleChange({ ...example, file: { name: file.name, url: file_url, type: file.type } });
     setUploading(false);
     e.target.value = "";
   };
@@ -150,11 +162,12 @@ function ExamplePair({ example, index, onChange, onRemove }) {
           <div className="flex-1 min-h-0">
             <ExampleSplitView
               example={example}
-              onChange={onChange}
+              onChange={handleChange}
               fileInputRef={fileInputRef}
               uploading={uploading}
               isImage={isImage}
               onAttachClick={() => fileInputRef.current?.click()}
+              saved={saved}
             />
           </div>
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
