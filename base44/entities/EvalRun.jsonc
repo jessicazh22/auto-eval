@@ -1,0 +1,32 @@
+{
+  "name": "EvalRun",
+  "type": "object",
+  "properties": {
+    "prompt_id": {
+      "type": "string",
+      "description": "FK to Prompt"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "complete",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Current status of the eval run"
+    },
+    "overall_score": {
+      "type": "number",
+      "description": "Average score across all results (0-100)"
+    },
+    "test_inputs_count": {
+      "type": "number",
+      "description": "Number of test inputs"
+    }
+  },
+  "required": [
+    "prompt_id"
+  ]
+}

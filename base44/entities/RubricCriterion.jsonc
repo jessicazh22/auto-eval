@@ -1,0 +1,27 @@
+{
+  "name": "RubricCriterion",
+  "type": "object",
+  "properties": {
+    "rubric_id": {
+      "type": "string",
+      "description": "FK to Rubric"
+    },
+    "name": {
+      "type": "string",
+      "description": "Criterion name"
+    },
+    "description": {
+      "type": "string",
+      "description": "What this criterion evaluates"
+    },
+    "weight": {
+      "type": "number",
+      "description": "Raw weight 0-1"
+    }
+  },
+  "required": [
+    "rubric_id",
+    "name",
+    "description"
+  ]
+}

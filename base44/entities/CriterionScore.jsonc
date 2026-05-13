@@ -1,0 +1,26 @@
+{
+  "name": "CriterionScore",
+  "type": "object",
+  "properties": {
+    "eval_result_id": {
+      "type": "string",
+      "description": "FK to EvalResult"
+    },
+    "criterion_name": {
+      "type": "string",
+      "description": "Name of the criterion scored"
+    },
+    "score": {
+      "type": "number",
+      "description": "Score 0-10"
+    },
+    "reasoning": {
+      "type": "string",
+      "description": "Explanation for the score"
+    }
+  },
+  "required": [
+    "eval_result_id",
+    "criterion_name"
+  ]
+}

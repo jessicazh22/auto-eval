@@ -1,0 +1,31 @@
+{
+  "name": "EvalResult",
+  "type": "object",
+  "properties": {
+    "eval_run_id": {
+      "type": "string",
+      "description": "FK to EvalRun"
+    },
+    "test_input": {
+      "type": "string",
+      "description": "The test input text"
+    },
+    "raw_output": {
+      "type": "string",
+      "description": "LLM-generated output"
+    },
+    "overall_score": {
+      "type": "number",
+      "description": "Weighted score for this result (0-100)"
+    },
+    "flagged": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this result is below passing threshold"
+    }
+  },
+  "required": [
+    "eval_run_id",
+    "test_input"
+  ]
+}
