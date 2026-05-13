@@ -2,11 +2,78 @@ import { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Paperclip, X, Loader2, Plus, Trash2 } from "lucide-react";
+import { Paperclip, X, Loader2, Plus, Trash2, Maximize2, Minimize2 } from "lucide-react";
+
+function ExampleSplitView({ example, onChange, fileInputRef, uploading, isImage, onAttachClick }) {
+  return (
+    <div className="grid grid-cols-2 divide-x divide-border h-full">
+      {/* Left: Asset / Output viewer */}
+      <div className="flex flex-col min-h-0">
+        <div className="px-4 py-2.5 border-b border-border bg-muted/20 flex items-center justify-between shrink-0">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Output / Asset</p>
+          {!example.file ? (
+            <button
+              onClick={onAttachClick}
+              disabled={uploading}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+            >
+              {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paperclip className="w-3 h-3" />}
+              {uploading ? "Uploading..." : "Attach file"}
+            </button>
+          ) : (
+            <button
+              onClick={() => onChange({ ...example, file: null })}
+              className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+            >
+              <X className="w-3 h-3" /> Remove
+            </button>
+          )}
+        </div>
+        <div className="flex-1 p-4 overflow-auto">
+          {example.file ? (
+            isImage ? (
+              <img src={example.file.url} alt={example.file.name} className="w-full h-full object-contain rounded-md" />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
+                <Paperclip className="w-8 h-8" />
+                <a href={example.file.url} target="_blank" rel="noreferrer" className="text-sm hover:underline text-foreground">
+                  {example.file.name}
+                </a>
+              </div>
+            )
+          ) : (
+            <Textarea
+              value={example.text || ""}
+              onChange={(e) => onChange({ ...example, text: e.target.value })}
+              placeholder="Paste example output text here..."
+              className="text-sm resize-none w-full h-full min-h-[320px] border-0 focus-visible:ring-0 shadow-none p-0 font-mono"
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Right: Annotation */}
+      <div className="flex flex-col min-h-0">
+        <div className="px-4 py-2.5 border-b border-border bg-muted/20 shrink-0">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Your Comments</p>
+        </div>
+        <div className="flex-1 p-4">
+          <Textarea
+            value={example.annotation || ""}
+            onChange={(e) => onChange({ ...example, annotation: e.target.value })}
+            placeholder="What's good or bad about this output? Be specific — e.g. 'tone is too formal', 'missing the key point about X', 'formatting is perfect'..."
+            className="text-sm resize-none w-full h-full min-h-[320px] border-0 focus-visible:ring-0 shadow-none p-0"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ExamplePair({ example, index, onChange, onRemove }) {
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
@@ -20,84 +87,80 @@ function ExamplePair({ example, index, onChange, onRemove }) {
 
   const isImage = example.file?.type?.startsWith("image/");
 
+  const preview = example.file
+    ? example.file.name
+    : example.text?.trim().slice(0, 80) || null;
+
+  const annotationPreview = example.annotation?.trim().slice(0, 80) || null;
+
   return (
-    <div className="border border-border rounded-lg overflow-hidden bg-card">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/30">
-        <span className="text-xs font-medium text-muted-foreground">Example {index + 1}</span>
-        <button onClick={onRemove} className="text-muted-foreground hover:text-destructive transition-colors">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 divide-x divide-border" style={{ minHeight: "480px" }}>
-        {/* Left: Asset / Output viewer */}
-        <div className="flex flex-col">
-          <div className="px-4 py-2.5 border-b border-border bg-muted/20 flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Output / Asset</p>
-            {!example.file && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-              >
-                {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paperclip className="w-3 h-3" />}
-                {uploading ? "Uploading..." : "Attach file"}
-              </button>
-            )}
-            {example.file && (
-              <button
-                onClick={() => onChange({ ...example, file: null })}
-                className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
-              >
-                <X className="w-3 h-3" /> Remove
-              </button>
-            )}
-            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
-          </div>
-
-          <div className="flex-1 p-4 overflow-auto">
-            {example.file ? (
-              isImage ? (
-                <img
-                  src={example.file.url}
-                  alt={example.file.name}
-                  className="w-full h-full object-contain rounded-md"
-                />
+    <>
+      {/* Collapsed card */}
+      <div className="border border-border rounded-lg overflow-hidden bg-card">
+        <div className="flex items-center justify-between px-4 py-3 bg-muted/20">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-xs font-semibold text-muted-foreground shrink-0">Example {index + 1}</span>
+            <div className="flex gap-3 min-w-0 text-xs text-muted-foreground truncate">
+              {preview ? (
+                <span className="truncate italic">"{preview}{example.text?.length > 80 || (example.file?.name?.length > 80) ? '…' : ''}"</span>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
-                  <Paperclip className="w-8 h-8" />
-                  <a href={example.file.url} target="_blank" rel="noreferrer" className="text-sm hover:underline text-foreground">
-                    {example.file.name}
-                  </a>
-                </div>
-              )
-            ) : (
-              <Textarea
-                value={example.text || ""}
-                onChange={(e) => onChange({ ...example, text: e.target.value })}
-                placeholder="Paste example output text here..."
-                className="text-sm resize-none w-full h-full min-h-[380px] border-0 focus-visible:ring-0 shadow-none p-0 font-mono"
-              />
-            )}
+                <span className="text-muted-foreground/50">No output yet</span>
+              )}
+              {annotationPreview && (
+                <>
+                  <span className="shrink-0">·</span>
+                  <span className="truncate">💬 {annotationPreview}{example.annotation?.length > 80 ? '…' : ''}</span>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 ml-3">
+            <button
+              onClick={() => setExpanded(true)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+              Edit
+            </button>
+            <button onClick={onRemove} className="text-muted-foreground hover:text-destructive transition-colors p-1">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
+      </div>
 
-        {/* Right: Annotation */}
-        <div className="flex flex-col">
-          <div className="px-4 py-2.5 border-b border-border bg-muted/20">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Your Comments</p>
+      {/* Fullscreen overlay */}
+      {expanded && (
+        <div className="fixed inset-0 z-50 bg-background flex flex-col">
+          <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card shrink-0">
+            <span className="text-sm font-medium">Example {index + 1}</span>
+            <div className="flex items-center gap-2">
+              <button onClick={onRemove} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1">
+                <Trash2 className="w-3.5 h-3.5" /> Delete
+              </button>
+              <button
+                onClick={() => setExpanded(false)}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border border-border hover:bg-muted"
+              >
+                <Minimize2 className="w-3.5 h-3.5" />
+                Done
+              </button>
+            </div>
           </div>
-          <div className="flex-1 p-4">
-            <Textarea
-              value={example.annotation || ""}
-              onChange={(e) => onChange({ ...example, annotation: e.target.value })}
-              placeholder="What's good or bad about this output? What should be different? Be specific — e.g. 'tone is too formal', 'missing the key point about X', 'formatting is perfect'..."
-              className="text-sm resize-none w-full h-full min-h-[380px] border-0 focus-visible:ring-0 shadow-none p-0"
+          <div className="flex-1 min-h-0">
+            <ExampleSplitView
+              example={example}
+              onChange={onChange}
+              fileInputRef={fileInputRef}
+              uploading={uploading}
+              isImage={isImage}
+              onAttachClick={() => fileInputRef.current?.click()}
             />
           </div>
+          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
 
@@ -115,7 +178,7 @@ export default function ExampleAnnotator({ examples, onChange }) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {examples.map((ex, i) => (
         <ExamplePair
           key={i}
