@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import ScoreBadge from "@/components/shared/ScoreBadge";
 import DeltaBadge from "@/components/shared/DeltaBadge";
 import CollapsibleDiffViewer from "@/components/experiments/CollapsibleDiffViewer";
@@ -73,6 +73,7 @@ export default function Experiments() {
               onViewPrompt={() => navigate(`/prompt/${v.prompt_id}`)}
               onViewRun={() => navigate(`/run/${v.variant_eval_run_id}`)}
               onApplied={() => queryClient.invalidateQueries({ queryKey: ["all-variants"] })}
+              onDeleted={() => queryClient.invalidateQueries({ queryKey: ["all-variants"] })}
             />
           );
         })}
@@ -81,9 +82,36 @@ export default function Experiments() {
   );
 }
 
-function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }) {
+function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, onDeleted }) {
   const delta = variant.score_delta;
   const isRunning = variant.status === "running" || variant.status === "generating";
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: () => base44.entities.PromptVariant.delete(variant.id),
+    onSuccess: () => onDeleted(),
+  });
+
+  if (showDeleteConfirm) {
+    return (
+      <div className="border border-destructive rounded-lg bg-destructive/5 p-4">
+        <p className="text-sm font-medium mb-3">Delete this experiment?</p>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => deleteMutation.mutate()}
+            disabled={deleteMutation.isPending}
+          >
+            {deleteMutation.isPending ? "Deleting…" : "Delete"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="border rounded-lg bg-card overflow-hidden">
@@ -146,6 +174,14 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }
           ) : variant.status === "failed" ? (
             <span className="text-xs text-destructive">Failed</span>
           ) : null}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
