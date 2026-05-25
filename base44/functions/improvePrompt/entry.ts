@@ -32,6 +32,17 @@ Deno.serve(async (req) => {
     .map(([name, score]) => `- ${name}: ${score}/10`)
     .join('\n');
 
+  // Fetch previous variants to avoid repeating changes
+  const previousVariants = await base44.asServiceRole.entities.PromptVariant.filter({ prompt_id: prompt.id });
+  let previousChangesContext = '';
+  if (previousVariants.length > 0) {
+    const recentChanges = previousVariants
+      .slice(0, 5)
+      .map(v => `- ${v.change_summary}`)
+      .join('\n');
+    previousChangesContext = `\n\nPREVIOUS CHANGES TRIED:\n${recentChanges}\n\nDo NOT suggest any of these changes again.`;
+  }
+
   // Build annotation context
   let annotationContext = '';
   if (annotations && annotations.length > 0) {
@@ -49,15 +60,15 @@ Deno.serve(async (req) => {
   // Ask LLM to make ONE targeted change
   const improvementPrompt = `You are a prompt engineer improving an LLM system prompt by making exactly ONE targeted change.
 
-CURRENT PROMPT:
-${originalText}
+  CURRENT PROMPT:
+  ${originalText}
 
-EVALUATION SCORES (0-10 per criterion):
-${criterionSummary}
+  EVALUATION SCORES (0-10 per criterion):
+  ${criterionSummary}
 
-Weakest criterion: ${weakestCriterion}${annotationContext}
+  Weakest criterion: ${weakestCriterion}${previousChangesContext}${annotationContext}
 
-Make the single most impactful change to improve "${weakestCriterion}". Do not restructure or rewrite the whole prompt — only one targeted change.
+  Make the single most impactful change to improve "${weakestCriterion}". Do not restructure or rewrite the whole prompt — only one targeted change. Suggest something NEW and DIFFERENT from previous attempts.
 
 Return a JSON object with:
 - improved_prompt: the full improved prompt text with only one targeted change applied (do NOT include any evaluation scores, task instructions, or meta-commentary in the prompt itself)
