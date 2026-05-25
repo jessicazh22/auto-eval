@@ -25,6 +25,7 @@ export default function GenerateRubric() {
 
   // Examples mode state
   const [examples, setExamples] = useState([{ text: "", file: null, annotation: "" }]);
+  const examplesRef = useRef(examples);
 
   // General mode state
   const [feedbackText, setFeedbackText] = useState("");
@@ -50,6 +51,9 @@ export default function GenerateRubric() {
       setExamples([{ text: "", file: null, annotation: "" }]);
     }
   }, [selectedPromptId, prompts]);
+
+  // Keep ref in sync so onSave always has latest value
+  useEffect(() => { examplesRef.current = examples; }, [examples]);
 
   // Auto-save examples to prompt entity (debounced)
   const handleExamplesChange = (updated) => {
@@ -202,7 +206,7 @@ export default function GenerateRubric() {
             onSave={selectedPromptId ? async () => {
               clearTimeout(saveExamplesTimer.current);
               setSavingExamples(true);
-              await base44.entities.Prompt.update(selectedPromptId, { rubric_examples: examples });
+              await base44.entities.Prompt.update(selectedPromptId, { rubric_examples: examplesRef.current });
               setSavingExamples(false);
             } : undefined}
           />
