@@ -84,7 +84,7 @@ export default function EvalRunDetail() {
         <h1 className="text-xl font-semibold">{prompt?.name || "Eval Run"}</h1>
         <StatusBadge status={run.status} />
         <span className="text-sm text-muted-foreground">
-          {new Date(run.created_date).toLocaleString("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}
+          {new Date(run.created_date).toLocaleString("en-AU", { timeZone: "Australia/Sydney", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })} AEST
         </span>
         {run.status === "complete" && (
           <div className="ml-auto flex items-center gap-2">
@@ -113,14 +113,12 @@ export default function EvalRunDetail() {
               <GitBranch className="w-3.5 h-3.5" />
               A/B Tweak
             </Button>
-            {prompt && (
-              <button
-                onClick={() => navigate(`/variants/${prompt.id}`)}
-                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
-              >
-                View all improvements →
-              </button>
-            )}
+            <button
+              onClick={() => navigate(`/experiments`)}
+              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+            >
+              View all experiments →
+            </button>
           </div>
         )}
       </div>

@@ -11,6 +11,7 @@ import PromptDetail from './pages/PromptDetail';
 import EvalRunDetail from './pages/EvalRunDetail';
 import GenerateRubric from './pages/GenerateRubric';
 import PromptVariantDashboard from './pages/PromptVariantDashboard';
+import Experiments from './pages/Experiments';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -44,6 +45,7 @@ const AuthenticatedApp = () => {
         <Route path="/run/:id" element={<EvalRunDetail />} />
         <Route path="/generate-rubric" element={<GenerateRubric />} />
         <Route path="/variants/:id" element={<PromptVariantDashboard />} />
+        <Route path="/experiments" element={<Experiments />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
