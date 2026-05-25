@@ -24,25 +24,26 @@ Deno.serve(async (req) => {
     originalText = await res.text();
   }
 
-  // Phase 1: Generate Diagnosis from reference docs
+  // Phase 1: Generate Diagnosis from reference docs (optional)
   let diagnosis = '';
-  const testInputs = await base44.asServiceRole.entities.TestInput.filter({ prompt_id: prompt.id });
-  if (testInputs.length > 0) {
-    const testInput = testInputs[0];
-    const refDocs = testInput.reference_docs || [];
-    
-    if (refDocs.length > 0) {
-      // Fetch first reference doc as gold standard
-      const goldRes = await fetch(refDocs[0].url);
-      const goldStandard = await goldRes.text();
+  try {
+    const testInputs = await base44.asServiceRole.entities.TestInput.filter({ prompt_id: prompt.id });
+    if (testInputs.length > 0) {
+      const testInput = testInputs[0];
+      const refDocs = testInput.reference_docs || [];
       
-      // Get current output by running prompt on test input
-      const currentOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
-        prompt: `${originalText}\n\nTest input: ${testInput.name}`
-      });
-      
-      // Ask LLM to diagnose the gap
-      const diagnosisPrompt = `Compare these two outputs:
+      if (refDocs.length > 0) {
+        // Fetch first reference doc as gold standard
+        const goldRes = await fetch(refDocs[0].url);
+        const goldStandard = await goldRes.text();
+        
+        // Get current output by running prompt on test input
+        const currentOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
+          prompt: `${originalText}\n\nTest input: ${testInput.name}`
+        });
+        
+        // Ask LLM to diagnose the gap
+        const diagnosisPrompt = `Compare these two outputs:
 
 GOLD STANDARD (what we want):
 ${goldStandard}
@@ -51,11 +52,15 @@ CURRENT OUTPUT (what the prompt produces):
 ${currentOutput}
 
 Identify the specific gap: What instruction, wording, or constraint is missing from the prompt that causes this difference? Be concise and specific.`;
-      
-      diagnosis = await base44.asServiceRole.integrations.Core.InvokeLLM({
-        prompt: diagnosisPrompt
-      });
+        
+        diagnosis = await base44.asServiceRole.integrations.Core.InvokeLLM({
+          prompt: diagnosisPrompt
+        });
+      }
     }
+  } catch (e) {
+    console.error("Diagnosis generation failed (non-critical):", e.message);
+    // Continue without diagnosis - it's optional
   }
 
   // Build criterion context
