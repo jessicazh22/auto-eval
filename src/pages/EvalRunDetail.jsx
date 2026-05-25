@@ -78,18 +78,21 @@ export default function EvalRunDetail() {
        const improvRes = await fetch(variant.improved_prompt_text);
        const improvText = await improvRes.text();
 
-       // Find longest contiguous substring in improved that's not in original
-       const words = improvText.split(/\s+/).filter(w => w.length > 0);
-       let longest = "";
-       for (let i = 0; i < words.length; i++) {
-         for (let j = i + 1; j <= Math.min(i + 10, words.length); j++) {
-           const phrase = words.slice(i, j).join(" ");
-           if (!origText.includes(phrase) && phrase.length > longest.length) {
-             longest = phrase;
+       const origWords = origText.split(/\s+/).filter(w => w);
+       const improvWords = improvText.split(/\s+/).filter(w => w);
+
+       // Find longest added sequence
+       let maxAdded = [];
+       for (let i = 0; i < improvWords.length; i++) {
+         for (let j = i + 1; j <= improvWords.length; j++) {
+           const seq = improvWords.slice(i, j);
+           const phrase = seq.join(" ");
+           if (!origText.includes(phrase) && seq.length > maxAdded.length) {
+             maxAdded = seq;
            }
          }
        }
-       return longest || "changes";
+       return maxAdded.length > 0 ? maxAdded.join(" ") : "changes";
      },
      enabled: !!variant?.original_prompt_text && !!variant?.improved_prompt_text,
    });
