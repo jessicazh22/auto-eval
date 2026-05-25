@@ -52,12 +52,21 @@ export default function EvalRunDetail() {
   });
 
   const { data: parentRun } = useQuery({
-    queryKey: ["parent-run", variant?.parent_eval_run_id],
+    queryKey: ["parent-run", variant?.parent_eval_run_id, run?.prompt_id],
     queryFn: async () => {
-      const runs = await base44.entities.EvalRun.filter({ id: variant.parent_eval_run_id });
-      return runs[0] || null;
+      if (variant?.parent_eval_run_id) {
+        const runs = await base44.entities.EvalRun.filter({ id: variant.parent_eval_run_id });
+        return runs[0] || null;
+      }
+      if (run?.prompt_id) {
+        const allRuns = await base44.entities.EvalRun.filter({ prompt_id: run.prompt_id });
+        const sorted = allRuns.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+        const currentIndex = sorted.findIndex(r => r.id === runId);
+        return currentIndex > 0 ? sorted[currentIndex + 1] : null;
+      }
+      return null;
     },
-    enabled: !!variant?.parent_eval_run_id,
+    enabled: !!run?.prompt_id,
   });
 
   // Poll while running
@@ -187,7 +196,7 @@ export default function EvalRunDetail() {
       ) : null}
 
       {/* Comparison with parent run */}
-      {variant && parentRun && run.status === "complete" && (
+      {parentRun && run.status === "complete" && (
         <div className="border rounded-lg p-4 bg-card">
           <h2 className="text-sm font-semibold mb-3">Criterion Comparison</h2>
           <div className="grid grid-cols-2 gap-4 text-xs">
