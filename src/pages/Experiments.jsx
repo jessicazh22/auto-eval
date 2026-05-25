@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { TrendingUp, TrendingDown, Minus, Loader2, Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import ScoreBadge from "@/components/shared/ScoreBadge";
+import DeltaBadge from "@/components/shared/DeltaBadge";
 import CollapsibleDiffViewer from "@/components/experiments/CollapsibleDiffViewer";
 import NewExperimentModal from "@/components/experiments/NewExperimentModal";
 import { Button } from "@/components/ui/button";
+import { useVariantPolling } from "@/hooks/useVariantPolling";
 
 export default function Experiments() {
   const navigate = useNavigate();
@@ -24,31 +26,7 @@ export default function Experiments() {
   });
 
   const promptMap = Object.fromEntries(prompts.map(p => [p.id, p]));
-
-  const hasRunning = variants.some(v => v.status === "running" || v.status === "generating");
-  useEffect(() => {
-    if (!hasRunning) return;
-    const interval = setInterval(async () => {
-      for (const v of variants) {
-        if ((v.status === "running" || v.status === "generating") && v.variant_eval_run_id) {
-          const runs = await base44.entities.EvalRun.filter({ id: v.variant_eval_run_id });
-          const run = runs[0];
-          if (run?.status === "complete") {
-             const delta = (run.overall_score || 0) - (v.original_score || 0);
-             await base44.entities.PromptVariant.update(v.id, {
-               variant_score: run.overall_score,
-               score_delta: Math.round(delta * 10) / 10,
-               status: "complete",
-             });
-          } else if (run?.status === "failed") {
-            await base44.entities.PromptVariant.update(v.id, { status: "failed" });
-          }
-        }
-      }
-      queryClient.invalidateQueries({ queryKey: ["all-variants"] });
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [hasRunning, variants, queryClient]);
+  useVariantPolling(variants, queryClient, ["all-variants"]);
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-6">
@@ -178,24 +156,5 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }
         />
       )}
     </div>
-  );
-}
-
-function DeltaBadge({ delta }) {
-  if (delta == null) return null;
-  if (delta > 0) return (
-    <span className="flex items-center gap-0.5 text-xs font-semibold text-green-600">
-      <TrendingUp className="w-3.5 h-3.5" />+{delta.toFixed(1)}
-    </span>
-  );
-  if (delta < 0) return (
-    <span className="flex items-center gap-0.5 text-xs font-semibold text-red-500">
-      <TrendingDown className="w-3.5 h-3.5" />{delta.toFixed(1)}
-    </span>
-  );
-  return (
-    <span className="flex items-center gap-0.5 text-xs font-semibold text-muted-foreground">
-      <Minus className="w-3 h-3" />0
-    </span>
   );
 }

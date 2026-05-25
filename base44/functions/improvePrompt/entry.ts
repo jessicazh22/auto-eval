@@ -5,7 +5,7 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { eval_run_id, annotations, target_criterion_override } = await req.json();
+  const { eval_run_id, target_criterion_override } = await req.json();
   if (!eval_run_id) return Response.json({ error: 'eval_run_id required' }, { status: 400 });
 
   // Fetch the run and prompt
@@ -71,20 +71,6 @@ Identify the specific gap: What instruction, wording, or constraint is missing f
     .map(([name, score]) => `- ${name}: ${score}/10`)
     .join('\n');
 
-  // Build annotation context
-  let annotationContext = '';
-  if (annotations && annotations.length > 0) {
-    const parts = annotations
-      .filter(a => a.annotation && a.annotation.trim())
-      .map((a, i) => {
-        const content = a.file ? `[File: ${a.file.name}]` : (a.text || '').slice(0, 500);
-        return `Example ${i + 1}:\nOutput: ${content}\nAnnotation: ${a.annotation}`;
-      });
-    if (parts.length > 0) {
-      annotationContext = `\n\nHUMAN ANNOTATIONS ON REAL OUTPUTS:\n${parts.join('\n\n')}`;
-    }
-  }
-
   // Ask LLM to make ONE targeted change
   const improvementPrompt = `You are a prompt engineer improving an LLM system prompt by making exactly ONE targeted change.
 
@@ -94,7 +80,7 @@ Identify the specific gap: What instruction, wording, or constraint is missing f
   EVALUATION SCORES (0-10 per criterion):
   ${criterionSummary}
 
-  Weakest criterion: ${weakestCriterion}${annotationContext}
+  Weakest criterion: ${weakestCriterion}
 
   Make the single most impactful change to improve "${weakestCriterion}". Do not restructure or rewrite the whole prompt — only one targeted change.
 

@@ -3,13 +3,11 @@ import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
 
 export default function NewExperimentModal({ open, onClose, onStarted }) {
   const [selectedPromptId, setSelectedPromptId] = useState("");
   const [selectedRunId, setSelectedRunId] = useState("");
   const [selectedCriterion, setSelectedCriterion] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
   const { data: prompts = [] } = useQuery({
     queryKey: ["prompts"],
@@ -40,13 +38,10 @@ export default function NewExperimentModal({ open, onClose, onStarted }) {
 
   const handleSubmit = async () => {
     if (!selectedRunId) return;
-    setSubmitting(true);
-    // Close modal immediately, let async work happen in background
     onStarted();
     onClose();
     base44.functions.invoke("improvePrompt", {
       eval_run_id: selectedRunId,
-      annotations: [],
       target_criterion_override: selectedCriterion || undefined,
     }).catch(err => console.error("Experiment generation failed:", err));
   };
@@ -150,8 +145,8 @@ export default function NewExperimentModal({ open, onClose, onStarted }) {
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={!selectedRunId || submitting}>
-            {submitting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</> : "Start Experiment"}
+          <Button onClick={handleSubmit} disabled={!selectedRunId}>
+            Start Experiment
           </Button>
         </DialogFooter>
       </DialogContent>
