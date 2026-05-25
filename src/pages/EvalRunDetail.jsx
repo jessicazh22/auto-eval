@@ -7,15 +7,15 @@ import ScoreBadge from "@/components/shared/ScoreBadge";
 import StatusBadge from "@/components/shared/StatusBadge";
 import ResultRow from "@/components/run/ResultRow";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, TrendingDown, Sparkles, GitBranch } from "lucide-react";
-import ImproveFromAnnotationsModal from "@/components/variant/ImproveFromAnnotationsModal";
+import { ArrowLeft, TrendingDown, Sparkles, GitBranch, Loader2 } from "lucide-react";
+
 import { format } from "date-fns";
 
 export default function EvalRunDetail() {
   const runId = window.location.pathname.split("/run/")[1];
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [showImproveModal, setShowImproveModal] = useState(false);
+  const [improving, setImproving] = useState(false);
 
   const { data: run, isLoading } = useQuery({
     queryKey: ["run", runId],
@@ -91,11 +91,17 @@ export default function EvalRunDetail() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setShowImproveModal(true)}
+              disabled={improving}
+              onClick={async () => {
+                setImproving(true);
+                await base44.functions.invoke("improvePrompt", { eval_run_id: runId, annotations: [] });
+                setImproving(false);
+                navigate(`/variants/${run.prompt_id}`);
+              }}
               className="gap-1.5"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              Improve from Annotations
+              {improving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {improving ? "Generating..." : "Improve Prompt"}
             </Button>
             <Button
               size="sm"
@@ -163,18 +169,6 @@ export default function EvalRunDetail() {
           Running evaluation...
         </div>
       ) : null}
-
-      {showImproveModal && (
-        <ImproveFromAnnotationsModal
-          open={showImproveModal}
-          onOpenChange={setShowImproveModal}
-          evalRunId={runId}
-          promptId={run.prompt_id}
-          onStarted={(data) => {
-            navigate(`/variants/${run.prompt_id}`);
-          }}
-        />
-      )}
 
       {/* Results table */}
       <div className="border rounded-lg overflow-hidden">
