@@ -9,15 +9,15 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, Paperclip, AlertCircle } from "lucide-react";
+import { Play, Paperclip, AlertCircle, FileText, Scale } from "lucide-react";
 
 export default function RunEvalModal({ open, onOpenChange, prompt, criteria, onRunCreated }) {
   const [submitting, setSubmitting] = useState(false);
 
   const attachedFiles = prompt.attached_files || [];
-  const callEstimate = attachedFiles.length > 0
-    ? attachedFiles.length * (criteria.length + 1)
-    : criteria.length + 1;
+  const docsCount = attachedFiles.length || 1;
+  // Per doc: 1 generation call + 1 scoring call
+  const callEstimate = docsCount * 2;
 
   const handleRun = async () => {
     setSubmitting(true);
@@ -55,6 +55,16 @@ export default function RunEvalModal({ open, onOpenChange, prompt, criteria, onR
             </div>
           </div>
 
+          {/* System prompt preview */}
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">System Prompt</p>
+            <div className="bg-muted rounded-md px-3 py-2 text-xs font-mono text-muted-foreground max-h-24 overflow-y-auto whitespace-pre-wrap">
+              {prompt.prompt_text
+                ? (prompt.prompt_text.startsWith("http") ? "(stored as file — loaded at runtime)" : prompt.prompt_text)
+                : <span className="italic">No prompt text set.</span>}
+            </div>
+          </div>
+
           {/* Reference docs as inputs */}
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Reference Docs (test inputs)</p>
@@ -75,7 +85,36 @@ export default function RunEvalModal({ open, onOpenChange, prompt, criteria, onR
             )}
           </div>
 
-          <p className="text-xs text-muted-foreground">~{callEstimate} LLM calls</p>
+          {/* LLM call breakdown */}
+          <div className="border rounded-md p-3 space-y-2 bg-muted/40">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">~{callEstimate} LLM calls</p>
+            <div className="space-y-1.5">
+              {attachedFiles.length > 0 ? attachedFiles.map((f, i) => (
+                <div key={i} className="space-y-1">
+                  <p className="text-xs font-medium text-foreground truncate">{f.name}</p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground pl-2">
+                    <FileText className="w-3 h-3 shrink-0" />
+                    <span>1× generate output (system prompt + doc as input)</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground pl-2">
+                    <Scale className="w-3 h-3 shrink-0" />
+                    <span>1× score output against {criteria.length} criteria</span>
+                  </div>
+                </div>
+              )) : (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <FileText className="w-3 h-3 shrink-0" />
+                    <span>1× generate output (system prompt only)</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Scale className="w-3 h-3 shrink-0" />
+                    <span>1× score output against {criteria.length} criteria</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <DialogFooter>
