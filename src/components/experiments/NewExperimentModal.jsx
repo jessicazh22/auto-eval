@@ -41,17 +41,14 @@ export default function NewExperimentModal({ open, onClose, onStarted }) {
   const handleSubmit = async () => {
     if (!selectedRunId) return;
     setSubmitting(true);
-    try {
-      await base44.functions.invoke("improvePrompt", {
-        eval_run_id: selectedRunId,
-        annotations: [],
-        target_criterion_override: selectedCriterion || undefined,
-      });
-      onStarted();
-      onClose();
-    } finally {
-      setSubmitting(false);
-    }
+    // Close modal immediately, let async work happen in background
+    onStarted();
+    onClose();
+    base44.functions.invoke("improvePrompt", {
+      eval_run_id: selectedRunId,
+      annotations: [],
+      target_criterion_override: selectedCriterion || undefined,
+    }).catch(err => console.error("Experiment generation failed:", err));
   };
 
   const handleClose = () => {

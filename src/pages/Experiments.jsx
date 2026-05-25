@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { TrendingUp, TrendingDown, Minus, Loader2, Plus } from "lucide-react";
 import ScoreBadge from "@/components/shared/ScoreBadge";
-import PromptDiffViewer from "@/components/variant/PromptDiffViewer";
+import CollapsibleDiffViewer from "@/components/experiments/CollapsibleDiffViewer";
 import NewExperimentModal from "@/components/experiments/NewExperimentModal";
 import VariantActionBar from "@/components/experiments/VariantActionBar";
 import { Button } from "@/components/ui/button";
@@ -167,10 +167,18 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }
       </div>
 
       {variant.original_prompt_text && variant.improved_prompt_text && (
-        <PromptDiffViewer
+        <CollapsibleDiffViewer
           originalUrl={variant.original_prompt_text}
           improvedUrl={variant.improved_prompt_text}
         />
+      )}
+
+      {variant.status === "complete" && variant.variant_eval_run_id && (
+        <div className="px-5 py-2 border-t border-border">
+          <Button size="sm" variant="ghost" onClick={onViewRun} className="text-xs w-full justify-center">
+            View detailed results →
+          </Button>
+        </div>
       )}
 
       {variant.status === "complete" && (
