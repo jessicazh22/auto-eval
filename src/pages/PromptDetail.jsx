@@ -221,15 +221,7 @@ export default function PromptDetail() {
             onCriteriaChange={() => queryClient.invalidateQueries({ queryKey: ["criteria", rubric.id] })}
           />
         ) : (
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>No rubric yet.</span>
-            <button
-              onClick={() => navigate(`/generate-rubric?prompt=${promptId}`)}
-              className="text-foreground underline underline-offset-2 hover:opacity-70 transition-opacity"
-            >
-              Generate one →
-            </button>
-          </div>
+          <p className="text-sm text-muted-foreground">Loading rubric...</p>
         )}
       </section>
 
