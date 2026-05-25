@@ -52,15 +52,25 @@ Deno.serve(async (req) => {
       criterionTotals[c.name] = { total: 0, count: 0 };
     }
 
-    // Each attached file is one test input
-    const testInputs = attachedFiles.length > 0 ? attachedFiles : [{ name: 'default', url: null }];
+    const RUNS_PER_DOC = 3;
+
+    // Each attached file is one test input, run RUNS_PER_DOC times each
+    const testFiles = attachedFiles.length > 0 ? attachedFiles : [{ name: 'default', url: null }];
+
+    // Expand: each file × RUNS_PER_DOC
+    const testInputs = testFiles.flatMap(file =>
+      Array.from({ length: RUNS_PER_DOC }, (_, i) => ({ file, runIndex: i + 1 }))
+    );
 
     // Create EvalResult records for each test input
     const evalResults = await Promise.all(
-      testInputs.map(async (file) => {
+      testInputs.map(async ({ file, runIndex }) => {
+        const label = testFiles.length > 1 || RUNS_PER_DOC > 1
+          ? `${file.name} (run ${runIndex}/${RUNS_PER_DOC})`
+          : file.name;
         const result = await base44.asServiceRole.entities.EvalResult.create({
           eval_run_id,
-          test_input: file.name,
+          test_input: label,
         });
         return { result, file };
       })
@@ -183,7 +193,7 @@ ${criteriaList}`;
     await base44.asServiceRole.entities.EvalRun.update(eval_run_id, {
       status: 'complete',
       overall_score: Math.round(runOverallScore * 10) / 10,
-      test_inputs_count: testInputs.length,
+      test_inputs_count: testFiles.length,
       weakest_criterion: weakestCriterion,
       weakest_criterion_score: weakestScore === Infinity ? null : weakestScore,
       criterion_averages: criterionAverages,

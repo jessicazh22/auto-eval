@@ -15,9 +15,10 @@ export default function RunEvalModal({ open, onOpenChange, prompt, criteria, onR
   const [submitting, setSubmitting] = useState(false);
 
   const attachedFiles = prompt.attached_files || [];
+  const RUNS_PER_DOC = 3;
   const docsCount = attachedFiles.length || 1;
-  // Per doc: 1 generation call + 1 scoring call
-  const callEstimate = docsCount * 2;
+  // Per doc per run: 1 generation + 1 scoring call
+  const callEstimate = docsCount * RUNS_PER_DOC * 2;
 
   const handleRun = async () => {
     setSubmitting(true);
@@ -87,32 +88,20 @@ export default function RunEvalModal({ open, onOpenChange, prompt, criteria, onR
 
           {/* LLM call breakdown */}
           <div className="border rounded-md p-3 space-y-2 bg-muted/40">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">~{callEstimate} LLM calls</p>
-            <div className="space-y-1.5">
-              {attachedFiles.length > 0 ? attachedFiles.map((f, i) => (
-                <div key={i} className="space-y-1">
-                  <p className="text-xs font-medium text-foreground truncate">{f.name}</p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground pl-2">
-                    <FileText className="w-3 h-3 shrink-0" />
-                    <span>1× generate output (system prompt + doc as input)</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground pl-2">
-                    <Scale className="w-3 h-3 shrink-0" />
-                    <span>1× score output against {criteria.length} criteria</span>
-                  </div>
-                </div>
-              )) : (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <FileText className="w-3 h-3 shrink-0" />
-                    <span>1× generate output (system prompt only)</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Scale className="w-3 h-3 shrink-0" />
-                    <span>1× score output against {criteria.length} criteria</span>
-                  </div>
-                </div>
-              )}
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              ~{callEstimate} LLM calls ({docsCount} doc{docsCount !== 1 ? "s" : ""} × {RUNS_PER_DOC} runs × 2)
+            </p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <FileText className="w-3 h-3 shrink-0" />
+              <span>Each doc is run {RUNS_PER_DOC}× to smooth LLM variance</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Scale className="w-3 h-3 shrink-0" />
+              <span>Each run: 1 generation + 1 scoring call against {criteria.length} criteria</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="text-foreground font-medium">Scores averaged</span>
+              <span>across all {docsCount * RUNS_PER_DOC} runs for final result</span>
             </div>
           </div>
         </div>
