@@ -78,29 +78,16 @@ export default function EvalRunDetail() {
        const improvRes = await fetch(variant.improved_prompt_text);
        const improvText = await improvRes.text();
 
-       const origWords = origText.split(/\s+/).filter(w => w);
-       const improvWords = improvText.split(/\s+/).filter(w => w);
+       // Split into sentences (period, exclamation, question mark)
+       const origSentences = origText.split(/(?<=[.!?])\s+/).filter(s => s.trim());
+       const improvSentences = improvText.split(/(?<=[.!?])\s+/).filter(s => s.trim());
 
-       // Find longest added sequence (contiguous block not in original)
-       let maxAdded = [];
-       for (let i = 0; i < improvWords.length; i++) {
-         for (let j = i + 1; j <= improvWords.length; j++) {
-           const seq = improvWords.slice(i, j);
-           const seqStr = seq.join(" ");
-           // Check if this exact sequence exists in original words
-           let found = false;
-           for (let k = 0; k <= origWords.length - seq.length; k++) {
-             if (origWords.slice(k, k + seq.length).join(" ") === seqStr) {
-               found = true;
-               break;
-             }
-           }
-           if (!found && seq.length > maxAdded.length) {
-             maxAdded = seq;
-           }
-         }
-       }
-       return maxAdded.length > 0 ? maxAdded.join(" ") : "";
+       // Find sentences that exist in improved but not in original
+       const addedSentences = improvSentences.filter(sent => 
+         !origSentences.some(orig => orig.toLowerCase().includes(sent.toLowerCase()) || sent.toLowerCase().includes(orig.toLowerCase()))
+       );
+
+       return addedSentences.length > 0 ? addedSentences.join(" ") : "";
      },
      enabled: !!variant?.original_prompt_text && !!variant?.improved_prompt_text,
    });
