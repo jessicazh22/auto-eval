@@ -10,6 +10,7 @@ import debounce from "lodash/debounce";
 import RubricEditor from "@/components/prompt/RubricEditor";
 import EvalRunsTable from "@/components/prompt/EvalRunsTable";
 import RunEvalModal from "@/components/prompt/RunEvalModal";
+import TestInputManager from "@/components/prompt/TestInputManager";
 
 export default function PromptDetail() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -211,7 +212,13 @@ export default function PromptDetail() {
         </div>
       </section>
 
-      {/* Section 2: Rubric */}
+      {/* Section 2: Test Inputs */}
+      <section className="space-y-3">
+        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Test Inputs</h2>
+        <TestInputManager promptId={promptId} />
+      </section>
+
+      {/* Section 3: Rubric */}
       <section className="space-y-3">
         <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Rubric</h2>
         {rubric ? (
