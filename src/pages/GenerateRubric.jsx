@@ -20,7 +20,9 @@ export default function GenerateRubric() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState("examples");
-  const [selectedPromptId, setSelectedPromptId] = useState("");
+  const [selectedPromptId, setSelectedPromptId] = useState(
+    () => new URLSearchParams(window.location.search).get("prompt") || ""
+  );
   const [savingExamples, setSavingExamples] = useState(false);
   const saveExamplesTimer = useRef(null);
 
@@ -155,6 +157,7 @@ Respond in JSON with:
     queryClient.invalidateQueries({ queryKey: ["rubric", selectedPromptId] });
     setSaving(false);
     setSaved(true);
+    navigate(`/prompt/${selectedPromptId}`);
   };
 
   const canGenerate = !!selectedPromptId && (
