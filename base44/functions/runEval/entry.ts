@@ -78,8 +78,10 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Generate output
-      const generatePrompt = `You are completing a task. Follow the system prompt instructions exactly.\n\nSYSTEM PROMPT:\n${promptText}\n\n${docContent ? `REFERENCE DOCUMENT (${file.name}):\n${docContent}` : ''}`;
+      // Generate output: system prompt defines the task, reference doc is the input
+      const generatePrompt = docContent
+        ? `${promptText}\n\n---\n\n${docContent}`
+        : promptText;
       const rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt: generatePrompt,
       });
