@@ -6,7 +6,6 @@ import { TrendingUp, TrendingDown, Minus, Loader2, Plus } from "lucide-react";
 import ScoreBadge from "@/components/shared/ScoreBadge";
 import CollapsibleDiffViewer from "@/components/experiments/CollapsibleDiffViewer";
 import NewExperimentModal from "@/components/experiments/NewExperimentModal";
-import VariantActionBar from "@/components/experiments/VariantActionBar";
 import { Button } from "@/components/ui/button";
 
 export default function Experiments() {
@@ -171,18 +170,6 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }
           originalUrl={variant.original_prompt_text}
           improvedUrl={variant.improved_prompt_text}
         />
-      )}
-
-      {variant.status === "complete" && variant.variant_eval_run_id && (
-        <div className="px-5 py-2 border-t border-border">
-          <Button size="sm" variant="ghost" onClick={onViewRun} className="text-xs w-full justify-center">
-            View detailed results →
-          </Button>
-        </div>
-      )}
-
-      {variant.status === "complete" && (
-        <VariantActionBar variant={variant} onActioned={onApplied} />
       )}
     </div>
   );
