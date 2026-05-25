@@ -110,7 +110,7 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }
   return (
     <div className="border rounded-lg bg-card overflow-hidden">
       <div className="px-5 py-4 flex items-start justify-between gap-4 border-b border-border">
-        <div className="space-y-1 min-w-0">
+        <div className="space-y-2 min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             {promptName && (
               <button onClick={onViewPrompt} className="text-xs font-medium text-primary hover:underline">
@@ -126,6 +126,12 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }
               </span>
             )}
           </div>
+          {variant.diagnosis && (
+            <div className="bg-slate-50 rounded p-2 border border-slate-200">
+              <p className="text-xs font-semibold text-slate-600 mb-0.5">DIAGNOSIS</p>
+              <p className="text-xs text-slate-700 leading-relaxed">{variant.diagnosis}</p>
+            </div>
+          )}
           <p className="text-sm font-medium">{variant.change_summary}</p>
           <p className="text-xs text-muted-foreground">
             {new Date(variant.created_date).toLocaleString("en-AU", {
@@ -136,7 +142,7 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 mt-1">
           {isRunning ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />

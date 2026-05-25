@@ -22,6 +22,10 @@
       "type": "string",
       "description": "URL to the improved prompt text file"
     },
+    "diagnosis": {
+      "type": "string",
+      "description": "Identified gap between current output and gold standard"
+    },
     "change_summary": {
       "type": "string",
       "description": "One-sentence description of the targeted change made"

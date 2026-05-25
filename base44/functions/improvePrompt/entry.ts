@@ -24,6 +24,41 @@ Deno.serve(async (req) => {
     originalText = await res.text();
   }
 
+  // Phase 1: Generate Diagnosis from reference docs
+  let diagnosis = '';
+  const testInputs = await base44.asServiceRole.entities.TestInput.filter({ prompt_id: prompt.id });
+  if (testInputs.length > 0) {
+    const testInput = testInputs[0];
+    const refDocs = testInput.reference_docs || [];
+    
+    if (refDocs.length > 0) {
+      // Fetch first reference doc as gold standard
+      const goldRes = await fetch(refDocs[0].url);
+      const goldStandard = await goldRes.text();
+      
+      // Get current output by running prompt on test input
+      const currentOutputRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+        prompt: `${originalText}\n\nTest input: ${testInput.name}`
+      });
+      const currentOutput = currentOutputRes;
+      
+      // Ask LLM to diagnose the gap
+      const diagnosisPrompt = `Compare these two outputs:
+
+GOLD STANDARD (what we want):
+${goldStandard}
+
+CURRENT OUTPUT (what the prompt produces):
+${currentOutput}
+
+Identify the specific gap: What instruction, wording, or constraint is missing from the prompt that causes this difference? Be concise and specific.`;
+      
+      diagnosis = await base44.asServiceRole.integrations.Core.InvokeLLM({
+        prompt: diagnosisPrompt
+      });
+    }
+  }
+
   // Build criterion context
   const criterionAverages = run.criterion_averages || {};
   const weakestCriterion = target_criterion_override || run.weakest_criterion || 'overall quality';
@@ -90,6 +125,7 @@ Return a JSON object with:
     parent_eval_run_id: eval_run_id,
     original_prompt_text: prompt.prompt_text || '',
     improved_prompt_text: improvedUrl,
+    diagnosis,
     change_summary,
     target_criterion,
     source: 'annotations',
