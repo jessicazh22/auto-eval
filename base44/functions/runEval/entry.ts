@@ -23,11 +23,16 @@ Deno.serve(async (req) => {
     const prompt = prompts[0];
     if (!prompt) throw new Error('Prompt not found');
 
-    // Fetch prompt text (stored as file URL), unless overridden
+    // Fetch prompt text — resolve URL whether from override or stored field
     let promptText = prompt_text_override || prompt.prompt_text || '';
-    if (!prompt_text_override && promptText.startsWith('http')) {
+    if (promptText.startsWith('http')) {
       const res = await fetch(promptText);
       promptText = await res.text();
+    }
+
+    if (!promptText.trim()) {
+      await base44.asServiceRole.entities.EvalRun.update(eval_run_id, { status: 'failed' });
+      return Response.json({ error: 'Prompt text is empty' }, { status: 400 });
     }
 
     const attachedFiles = prompt.attached_files || [];
@@ -101,9 +106,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Generate output: system prompt defines the task, reference doc is the input
+      // System prompt = task instructions, user turn = reference doc to process
       const generatePrompt = docContent
-        ? `${promptText}\n\n---\n\n${docContent}`
+        ? `<system>\n${promptText}\n</system>\n\n<user>\n${docContent}\n</user>`
         : promptText;
       const rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt: generatePrompt,
