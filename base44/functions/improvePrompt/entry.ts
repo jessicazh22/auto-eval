@@ -37,10 +37,9 @@ Deno.serve(async (req) => {
       const goldStandard = await goldRes.text();
       
       // Get current output by running prompt on test input
-      const currentOutputRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      const currentOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt: `${originalText}\n\nTest input: ${testInput.name}`
       });
-      const currentOutput = currentOutputRes;
       
       // Ask LLM to diagnose the gap
       const diagnosisPrompt = `Compare these two outputs:
