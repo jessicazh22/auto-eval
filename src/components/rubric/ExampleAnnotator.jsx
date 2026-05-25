@@ -73,7 +73,7 @@ function ExampleSplitView({ example, onChange, fileInputRef, uploading, isImage,
   );
 }
 
-function ExamplePair({ example, index, onChange, onRemove }) {
+function ExamplePair({ example, index, onChange, onRemove, onSave }) {
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -151,11 +151,11 @@ function ExamplePair({ example, index, onChange, onRemove }) {
                 <Trash2 className="w-3.5 h-3.5" /> Delete
               </button>
               <button
-                onClick={() => setExpanded(false)}
-                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border border-border hover:bg-muted"
+                onClick={() => { onSave && onSave(); setExpanded(false); }}
+                className="flex items-center gap-1.5 text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors px-3 py-1.5 rounded-md"
               >
-                <Minimize2 className="w-3.5 h-3.5" />
-                Done
+                <Check className="w-3.5 h-3.5" />
+                Save & Close
               </button>
             </div>
           </div>
@@ -168,6 +168,7 @@ function ExamplePair({ example, index, onChange, onRemove }) {
               isImage={isImage}
               onAttachClick={() => fileInputRef.current?.click()}
               saved={saved}
+              onSave={onSave}
             />
           </div>
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
@@ -177,7 +178,7 @@ function ExamplePair({ example, index, onChange, onRemove }) {
   );
 }
 
-export default function ExampleAnnotator({ examples, onChange }) {
+export default function ExampleAnnotator({ examples, onChange, onSave }) {
   const addExample = () => {
     onChange([...examples, { text: "", file: null, annotation: "" }]);
   };
@@ -199,6 +200,7 @@ export default function ExampleAnnotator({ examples, onChange }) {
           index={i}
           onChange={(updated) => updateExample(i, updated)}
           onRemove={() => removeExample(i)}
+          onSave={onSave}
         />
       ))}
       <Button variant="outline" size="sm" onClick={addExample} className="gap-1.5">

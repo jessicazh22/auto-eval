@@ -196,7 +196,16 @@ export default function GenerateRubric() {
               )}
             </div>
           )}
-          <ExampleAnnotator examples={examples} onChange={selectedPromptId ? handleExamplesChange : setExamples} />
+          <ExampleAnnotator
+            examples={examples}
+            onChange={selectedPromptId ? handleExamplesChange : setExamples}
+            onSave={selectedPromptId ? async () => {
+              clearTimeout(saveExamplesTimer.current);
+              setSavingExamples(true);
+              await base44.entities.Prompt.update(selectedPromptId, { rubric_examples: examples });
+              setSavingExamples(false);
+            } : undefined}
+          />
         </div>
       ) : (
         <Textarea
