@@ -142,14 +142,14 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }
               <Loader2 className="w-4 h-4 animate-spin" />
               Scoring…
             </div>
-          ) : variant.status === "complete" && variant.variant_score != null ? (
+          ) : variant.status === "complete" ? (
             <>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground mb-1">Before → After</p>
                 <div className="flex items-center gap-2">
                   <ScoreBadge score={variant.original_score} size="sm" />
                   <span className="text-muted-foreground">→</span>
-                  <ScoreBadge score={variant.variant_score} size="sm" />
+                  <ScoreBadge score={variant.variant_score || 0} size="sm" />
                   <DeltaBadge delta={delta} />
                 </div>
               </div>
