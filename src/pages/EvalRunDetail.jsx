@@ -81,7 +81,7 @@ export default function EvalRunDetail() {
         <h1 className="text-xl font-semibold">{prompt?.name || "Eval Run"}</h1>
         <StatusBadge status={run.status} />
         <span className="text-sm text-muted-foreground ml-auto">
-          {format(new Date(run.created_date), "MMM d, yyyy h:mm a")}
+          {new Date(run.created_date).toLocaleString("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}
         </span>
       </div>
 
