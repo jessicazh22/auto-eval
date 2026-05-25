@@ -208,7 +208,7 @@ export default function PromptDetail() {
         <RunEvalModal
           open={showRunModal}
           onOpenChange={setShowRunModal}
-          prompt={prompt}
+          prompt={{ ...prompt, attached_files: attachedFiles }}
           criteria={criteria}
           onRunCreated={(runId) => {
             queryClient.invalidateQueries({ queryKey: ["runs", promptId] });
