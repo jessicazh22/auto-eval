@@ -81,18 +81,26 @@ export default function EvalRunDetail() {
        const origWords = origText.split(/\s+/).filter(w => w);
        const improvWords = improvText.split(/\s+/).filter(w => w);
 
-       // Find longest added sequence
+       // Find longest added sequence (contiguous block not in original)
        let maxAdded = [];
        for (let i = 0; i < improvWords.length; i++) {
          for (let j = i + 1; j <= improvWords.length; j++) {
            const seq = improvWords.slice(i, j);
-           const phrase = seq.join(" ");
-           if (!origText.includes(phrase) && seq.length > maxAdded.length) {
+           const seqStr = seq.join(" ");
+           // Check if this exact sequence exists in original words
+           let found = false;
+           for (let k = 0; k <= origWords.length - seq.length; k++) {
+             if (origWords.slice(k, k + seq.length).join(" ") === seqStr) {
+               found = true;
+               break;
+             }
+           }
+           if (!found && seq.length > maxAdded.length) {
              maxAdded = seq;
            }
          }
        }
-       return maxAdded.length > 0 ? maxAdded.join(" ") : "changes";
+       return maxAdded.length > 0 ? maxAdded.join(" ") : "";
      },
      enabled: !!variant?.original_prompt_text && !!variant?.improved_prompt_text,
    });
@@ -260,7 +268,7 @@ export default function EvalRunDetail() {
             <div className="border-t pt-3 space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase">Experiment Hypothesis</p>
               <p className="text-sm leading-relaxed">
-                If we add <span className="font-semibold text-amber-600">"{extractedChange || "formatting changes"}"</span>, then <span className="font-semibold text-green-600">{variant.target_criterion}</span> should improve.
+                If we add <span className="font-semibold text-amber-600">"{extractedChange}"</span>, then <span className="font-semibold text-green-600">{variant.target_criterion}</span> should improve.
               </p>
               <p className="text-xs text-muted-foreground">
                 Result: {variant.score_delta > 0 ? "✓ Improved" : variant.score_delta < 0 ? "✗ Declined" : "— No change"} ({variant.score_delta > 0 ? "+" : ""}{variant.score_delta?.toFixed(1)})
