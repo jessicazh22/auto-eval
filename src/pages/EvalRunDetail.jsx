@@ -198,7 +198,12 @@ export default function EvalRunDetail() {
       {/* Comparison with parent run */}
       {parentRun && run.status === "complete" && (
         <div className="border rounded-lg p-4 bg-card">
-          <h2 className="text-sm font-semibold mb-3">Criterion Comparison</h2>
+          <h2 className="text-sm font-semibold mb-3">
+            Criterion Comparison
+            <span className="text-xs font-normal text-muted-foreground ml-2">
+              vs {new Date(parentRun.created_date).toLocaleString("en-AU", { timeZone: "Australia/Sydney", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}
+            </span>
+          </h2>
           <div className="grid grid-cols-2 gap-4 text-xs">
             {Object.entries(run.criterion_averages || {}).map(([criterion, score]) => {
               const parentScore = parentRun.criterion_averages?.[criterion] || 0;

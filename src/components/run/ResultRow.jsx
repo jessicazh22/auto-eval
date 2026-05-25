@@ -8,14 +8,30 @@ import { AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function ResultRow({ result, index }) {
-  const [expanded, setExpanded] = useState(false);
+   const [expanded, setExpanded] = useState(false);
 
-  const { data: scores } = useQuery({
-    queryKey: ["criterion-scores", result.id],
-    queryFn: () => base44.entities.CriterionScore.filter({ eval_result_id: result.id }),
-    enabled: expanded,
-    initialData: [],
-  });
+   const { data: scores } = useQuery({
+     queryKey: ["criterion-scores", result.id],
+     queryFn: () => base44.entities.CriterionScore.filter({ eval_result_id: result.id }),
+     enabled: expanded,
+     initialData: [],
+   });
+
+   const { data: evalRun } = useQuery({
+     queryKey: ["eval-run-for-result", result.eval_run_id],
+     queryFn: () => base44.entities.EvalRun.filter({ id: result.eval_run_id }),
+     enabled: expanded,
+     initialData: [],
+   });
+
+   const { data: variant } = useQuery({
+     queryKey: ["variant-for-eval-run", result.eval_run_id],
+     queryFn: async () => {
+       const vars = await base44.entities.PromptVariant.filter({ variant_eval_run_id: result.eval_run_id });
+       return vars[0] || null;
+     },
+     enabled: expanded,
+   });
 
   const truncate = (str, len = 60) => {
     if (!str) return "—";
@@ -107,14 +123,25 @@ export default function ResultRow({ result, index }) {
                 </Table>
               </div>
 
+              {variant && (
+                <div className="border-t pt-3 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">EXPERIMENT SUMMARY</p>
+                  <div className="text-xs space-y-1 text-foreground">
+                    <p><span className="font-medium">Hypothesis:</span> {variant.change_summary}</p>
+                    <p><span className="font-medium">Target:</span> {variant.target_criterion}</p>
+                    <p><span className="font-medium">Result:</span> Score {variant.original_score} → {variant.variant_score} ({variant.score_delta > 0 ? "+" : ""}{variant.score_delta?.toFixed(1)})</p>
+                  </div>
+                </div>
+              )}
+
               <div className="text-sm">
                 <span className="text-muted-foreground">Overall score: </span>
                 <ScoreBadge score={result.overall_score} size="md" />
               </div>
-            </div>
-          </TableCell>
-        </TableRow>
-      )}
+              </div>
+              </TableCell>
+              </TableRow>
+              )}
     </>
   );
 }
