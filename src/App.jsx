@@ -10,6 +10,7 @@ import Home from './pages/Home';
 import PromptDetail from './pages/PromptDetail';
 import EvalRunDetail from './pages/EvalRunDetail';
 import GenerateRubric from './pages/GenerateRubric';
+import PromptVariantDashboard from './pages/PromptVariantDashboard';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -42,6 +43,7 @@ const AuthenticatedApp = () => {
         <Route path="/prompt/:id" element={<PromptDetail />} />
         <Route path="/run/:id" element={<EvalRunDetail />} />
         <Route path="/generate-rubric" element={<GenerateRubric />} />
+        <Route path="/variants/:id" element={<PromptVariantDashboard />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

@@ -1,0 +1,68 @@
+{
+  "name": "PromptVariant",
+  "type": "object",
+  "properties": {
+    "prompt_id": {
+      "type": "string",
+      "description": "FK to original Prompt"
+    },
+    "parent_eval_run_id": {
+      "type": "string",
+      "description": "The eval run that triggered this improvement"
+    },
+    "variant_eval_run_id": {
+      "type": "string",
+      "description": "The eval run scoring this variant"
+    },
+    "original_prompt_text": {
+      "type": "string",
+      "description": "URL to the original prompt text file"
+    },
+    "improved_prompt_text": {
+      "type": "string",
+      "description": "URL to the improved prompt text file"
+    },
+    "change_summary": {
+      "type": "string",
+      "description": "One-sentence description of the targeted change made"
+    },
+    "target_criterion": {
+      "type": "string",
+      "description": "The criterion this change was targeted at improving"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "annotations",
+        "ab_tweak"
+      ],
+      "description": "What drove this improvement"
+    },
+    "original_score": {
+      "type": "number",
+      "description": "Overall score from parent eval run"
+    },
+    "variant_score": {
+      "type": "number",
+      "description": "Overall score from variant eval run"
+    },
+    "score_delta": {
+      "type": "number",
+      "description": "variant_score - original_score"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "generating",
+        "running",
+        "complete",
+        "failed"
+      ],
+      "default": "generating"
+    }
+  },
+  "required": [
+    "prompt_id",
+    "parent_eval_run_id"
+  ]
+}

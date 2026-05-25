@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -6,13 +6,16 @@ import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components
 import ScoreBadge from "@/components/shared/ScoreBadge";
 import StatusBadge from "@/components/shared/StatusBadge";
 import ResultRow from "@/components/run/ResultRow";
-import { ArrowLeft, TrendingDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, TrendingDown, Sparkles, GitBranch } from "lucide-react";
+import ImproveFromAnnotationsModal from "@/components/variant/ImproveFromAnnotationsModal";
 import { format } from "date-fns";
 
 export default function EvalRunDetail() {
   const runId = window.location.pathname.split("/run/")[1];
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [showImproveModal, setShowImproveModal] = useState(false);
 
   const { data: run, isLoading } = useQuery({
     queryKey: ["run", runId],
@@ -80,9 +83,40 @@ export default function EvalRunDetail() {
       <div className="flex items-center gap-4 flex-wrap">
         <h1 className="text-xl font-semibold">{prompt?.name || "Eval Run"}</h1>
         <StatusBadge status={run.status} />
-        <span className="text-sm text-muted-foreground ml-auto">
+        <span className="text-sm text-muted-foreground">
           {new Date(run.created_date).toLocaleString("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}
         </span>
+        {run.status === "complete" && (
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowImproveModal(true)}
+              className="gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Improve from Annotations
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled
+              className="gap-1.5 opacity-50 cursor-not-allowed"
+              title="Coming soon"
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+              A/B Tweak
+            </Button>
+            {prompt && (
+              <button
+                onClick={() => navigate(`/variants/${prompt.id}`)}
+                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+              >
+                View all improvements →
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Score summary */}
@@ -129,6 +163,18 @@ export default function EvalRunDetail() {
           Running evaluation...
         </div>
       ) : null}
+
+      {showImproveModal && (
+        <ImproveFromAnnotationsModal
+          open={showImproveModal}
+          onOpenChange={setShowImproveModal}
+          evalRunId={runId}
+          promptId={run.prompt_id}
+          onStarted={(data) => {
+            navigate(`/variants/${run.prompt_id}`);
+          }}
+        />
+      )}
 
       {/* Results table */}
       <div className="border rounded-lg overflow-hidden">

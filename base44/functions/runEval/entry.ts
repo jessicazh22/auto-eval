@@ -7,7 +7,7 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { eval_run_id } = await req.json();
+  const { eval_run_id, prompt_text_override } = await req.json();
   if (!eval_run_id) {
     return Response.json({ error: 'eval_run_id required' }, { status: 400 });
   }
@@ -23,9 +23,9 @@ Deno.serve(async (req) => {
     const prompt = prompts[0];
     if (!prompt) throw new Error('Prompt not found');
 
-    // Fetch prompt text (stored as file URL)
-    let promptText = prompt.prompt_text || '';
-    if (promptText.startsWith('http')) {
+    // Fetch prompt text (stored as file URL), unless overridden
+    let promptText = prompt_text_override || prompt.prompt_text || '';
+    if (!prompt_text_override && promptText.startsWith('http')) {
       const res = await fetch(promptText);
       promptText = await res.text();
     }
