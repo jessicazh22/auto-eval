@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Sparkles, ArrowLeft, Check, Info, Save } from "lucide-react";
+import { Loader2, ArrowLeft, Check, Info, Save } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import GeneratedRubricEditor from "@/components/rubric/GeneratedRubricEditor";
 import ExampleAnnotator from "@/components/rubric/ExampleAnnotator";
@@ -38,6 +38,8 @@ export default function GenerateRubric() {
   const [generatedCriteria, setGeneratedCriteria] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [senseCheck, setSenseCheck] = useState(null);
+  const [checkingRubric, setCheckingRubric] = useState(false);
 
   const { data: prompts = [] } = useQuery({
     queryKey: ["prompts"],
@@ -99,8 +101,34 @@ export default function GenerateRubric() {
       feedback_text,
       file_urls,
     });
-    setGeneratedCriteria(res.data.criteria || []);
+    const criteria = res.data.criteria || [];
+    setGeneratedCriteria(criteria);
     setGenerating(false);
+
+    // Auto sense-check the rubric
+    setCheckingRubric(true);
+    setSenseCheck(null);
+    const checkRes = await base44.integrations.Core.InvokeLLM({
+      prompt: `You are an expert at evaluating LLM evaluation rubrics. A user just generated this rubric from their feedback. Do a quick sense check and give concise, actionable advice.
+
+Rubric criteria:
+${criteria.map((c, i) => `${i + 1}. ${c.name} (weight: ${Math.round(c.weight * 100)}%): ${c.description}`).join("\n")}
+
+Respond in JSON with:
+- "verdict": "good" | "needs_work" | "poor"
+- "summary": one sentence on overall quality
+- "suggestions": array of up to 3 short, specific suggestions (what to add, remove, or change). Empty array if none needed.`,
+      response_json_schema: {
+        type: "object",
+        properties: {
+          verdict: { type: "string" },
+          summary: { type: "string" },
+          suggestions: { type: "array", items: { type: "string" } }
+        }
+      }
+    });
+    setSenseCheck(checkRes);
+    setCheckingRubric(false);
   };
 
   const handleSave = async (criteria) => {
@@ -145,7 +173,28 @@ export default function GenerateRubric() {
       </button>
 
       <div>
-        <h1 className="text-2xl font-semibold">Generate Rubric</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold">Generate Rubric</h1>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button className="text-muted-foreground hover:text-foreground transition-colors mt-0.5">
+                  <Info className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-xs text-xs space-y-1.5 p-3">
+                <p className="font-semibold text-sm">What makes a good rubric?</p>
+                <ul className="space-y-1 list-disc list-inside text-muted-foreground">
+                  <li><span className="text-foreground font-medium">Specific:</span> Each criterion targets one observable trait, not a vague feeling.</li>
+                  <li><span className="text-foreground font-medium">Diverse examples:</span> Mix good and bad outputs — explain exactly why each is good or bad.</li>
+                  <li><span className="text-foreground font-medium">Cover edge cases:</span> Include tricky or boundary-pushing inputs.</li>
+                  <li><span className="text-foreground font-medium">Weighted correctly:</span> Higher weight = more important to your prompt's goal.</li>
+                  <li><span className="text-foreground font-medium">3–5 examples</span> is a good start; add more only to cover gaps.</li>
+                </ul>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
         <p className="text-sm text-muted-foreground mt-1">
           Let AI generate evaluation criteria based on your inputs.
         </p>
@@ -248,36 +297,57 @@ export default function GenerateRubric() {
       )}
 
       {/* Generate button */}
-      <div className="flex items-center gap-2">
-        <Button onClick={handleGenerate} disabled={!canGenerate || generating} className="gap-2">
-          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          {generating ? "Generating rubric..." : "Generate Rubric"}
-        </Button>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button className="text-muted-foreground hover:text-foreground transition-colors">
-                <Info className="w-4 h-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="max-w-xs text-xs space-y-1.5 p-3">
-              <p className="font-semibold text-sm">What makes a good rubric?</p>
-              <ul className="space-y-1 list-disc list-inside text-muted-foreground">
-                <li><span className="text-foreground font-medium">Specific:</span> Each criterion should target one observable trait, not a vague feeling.</li>
-                <li><span className="text-foreground font-medium">Diverse examples:</span> Mix good and bad outputs and explain exactly why each is good or bad.</li>
-                <li><span className="text-foreground font-medium">Cover edge cases:</span> Include examples of tricky or boundary-pushing inputs.</li>
-                <li><span className="text-foreground font-medium">Weighted correctly:</span> Assign higher weight to what matters most for your prompt's goal.</li>
-                <li><span className="text-foreground font-medium">3–5 examples</span> is a good starting point; add more only to cover gaps.</li>
-              </ul>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+      <Button onClick={handleGenerate} disabled={!canGenerate || generating} className="gap-2">
+        {generating && <Loader2 className="w-4 h-4 animate-spin" />}
+        {generating ? "Generating rubric..." : "Generate Rubric"}
+      </Button>
 
       {/* Generated rubric */}
       {generatedCriteria && (
         <section className="space-y-4 pt-2 border-t border-border">
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Review & Edit</h2>
+
+          {/* Sense check panel */}
+          {(checkingRubric || senseCheck) && (
+            <div className={`rounded-lg border p-4 text-sm space-y-2 ${
+              checkingRubric ? "border-border bg-muted/30" :
+              senseCheck?.verdict === "good" ? "border-green-200 bg-green-50" :
+              senseCheck?.verdict === "needs_work" ? "border-yellow-200 bg-yellow-50" :
+              "border-red-200 bg-red-50"
+            }`}>
+              {checkingRubric ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Checking rubric quality...</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-semibold uppercase tracking-wider ${
+                      senseCheck?.verdict === "good" ? "text-green-700" :
+                      senseCheck?.verdict === "needs_work" ? "text-yellow-700" :
+                      "text-red-700"
+                    }`}>
+                      {senseCheck?.verdict === "good" ? "Looks good" :
+                       senseCheck?.verdict === "needs_work" ? "Needs some work" : "Needs improvement"}
+                    </span>
+                  </div>
+                  <p className="text-foreground">{senseCheck?.summary}</p>
+                  {senseCheck?.suggestions?.length > 0 && (
+                    <ul className="space-y-1 mt-1">
+                      {senseCheck.suggestions.map((s, i) => (
+                        <li key={i} className="flex items-start gap-1.5 text-muted-foreground">
+                          <span className="mt-0.5 shrink-0">→</span>
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           <GeneratedRubricEditor criteria={generatedCriteria} onChange={setGeneratedCriteria} />
           <div className="flex items-center gap-3">
             <Button onClick={() => handleSave(generatedCriteria)} disabled={saving || saved} className="gap-2">
