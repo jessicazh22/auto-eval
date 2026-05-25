@@ -34,12 +34,13 @@ export default function Experiments() {
           const runs = await base44.entities.EvalRun.filter({ id: v.variant_eval_run_id });
           const run = runs[0];
           if (run?.status === "complete") {
-            const delta = (run.overall_score || 0) - (v.original_score || 0);
-            await base44.entities.PromptVariant.update(v.id, {
-              variant_score: run.overall_score,
-              score_delta: Math.round(delta * 10) / 10,
-              status: "complete",
-            });
+             const compositeScore = (run.overall_score / 10) || 0;
+             const delta = compositeScore - (v.original_score || 0);
+             await base44.entities.PromptVariant.update(v.id, {
+               variant_score: compositeScore,
+               score_delta: Math.round(delta * 10) / 10,
+               status: "complete",
+             });
           } else if (run?.status === "failed") {
             await base44.entities.PromptVariant.update(v.id, { status: "failed" });
           }
