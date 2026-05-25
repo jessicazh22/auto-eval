@@ -8,113 +8,85 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Play, X } from "lucide-react";
+import { Play, Paperclip, AlertCircle } from "lucide-react";
 
 export default function RunEvalModal({ open, onOpenChange, prompt, criteria, onRunCreated }) {
-  const [inputText, setInputText] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const inputs = inputText
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const callEstimate = inputs.length > 0 ? inputs.length * (criteria.length + 1) : 0;
+  const attachedFiles = prompt.attached_files || [];
+  const callEstimate = attachedFiles.length > 0
+    ? attachedFiles.length * (criteria.length + 1)
+    : criteria.length + 1;
 
   const handleRun = async () => {
-    if (inputs.length === 0) return;
     setSubmitting(true);
 
     const run = await base44.entities.EvalRun.create({
       prompt_id: prompt.id,
       status: "pending",
-      test_inputs_count: inputs.length,
+      test_inputs_count: attachedFiles.length || 1,
     });
 
-    // Create EvalResult records for each input
-    await base44.entities.EvalResult.bulkCreate(
-      inputs.map((input) => ({
-        eval_run_id: run.id,
-        test_input: input,
-      }))
-    );
-
-    // Trigger the backend processing
     base44.functions.invoke("runEval", { eval_run_id: run.id });
 
     setSubmitting(false);
-    setInputText("");
     onOpenChange(false);
     onRunCreated(run.id);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Run Eval — {prompt.name}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
+          {/* Criteria */}
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2">RUBRIC CRITERIA</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Rubric Criteria</p>
             <div className="flex flex-wrap gap-1.5">
               {criteria.map((c) => (
                 <Badge key={c.id} variant="secondary" className="text-xs font-normal">
                   {c.name}
                 </Badge>
               ))}
-              {criteria.length === 0 && (
-                <p className="text-sm text-muted-foreground">No criteria defined yet.</p>
-              )}
             </div>
           </div>
 
+          {/* Reference docs as inputs */}
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2">TEST INPUTS — ONE PER LINE</p>
-            <Textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Paste your test inputs here, one per line..."
-              className="min-h-[160px] font-mono text-sm"
-            />
-          </div>
-
-          {inputs.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span>{inputs.length} input{inputs.length > 1 ? "s" : ""}</span>
-                <span>·</span>
-                <span>~{callEstimate} LLM calls</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto">
-                {inputs.map((input, i) => (
-                  <div
-                    key={i}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-muted text-xs max-w-[300px] truncate"
-                  >
-                    <span className="text-muted-foreground font-mono mr-1">{i + 1}</span>
-                    <span className="truncate">{input}</span>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Reference Docs (test inputs)</p>
+            {attachedFiles.length > 0 ? (
+              <div className="space-y-1.5">
+                {attachedFiles.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{f.name}</span>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>No reference docs attached. The eval will run the prompt with no input document.</span>
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground">~{callEstimate} LLM calls</p>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
             onClick={handleRun}
-            disabled={inputs.length === 0 || criteria.length === 0 || submitting}
+            disabled={criteria.length === 0 || submitting}
             className="gap-1.5"
           >
             <Play className="w-3.5 h-3.5" />
-            {submitting ? "Starting..." : "Run"}
+            {submitting ? "Starting..." : "Run Eval"}
           </Button>
         </DialogFooter>
       </DialogContent>

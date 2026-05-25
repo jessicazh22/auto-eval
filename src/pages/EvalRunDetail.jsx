@@ -6,7 +6,7 @@ import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components
 import ScoreBadge from "@/components/shared/ScoreBadge";
 import StatusBadge from "@/components/shared/StatusBadge";
 import ResultRow from "@/components/run/ResultRow";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, TrendingDown } from "lucide-react";
 import { format } from "date-fns";
 
 export default function EvalRunDetail() {
@@ -80,11 +80,55 @@ export default function EvalRunDetail() {
       <div className="flex items-center gap-4 flex-wrap">
         <h1 className="text-xl font-semibold">{prompt?.name || "Eval Run"}</h1>
         <StatusBadge status={run.status} />
-        <ScoreBadge score={run.status === "complete" ? run.overall_score : null} size="lg" />
         <span className="text-sm text-muted-foreground ml-auto">
           {format(new Date(run.created_date), "MMM d, yyyy h:mm a")}
         </span>
       </div>
+
+      {/* Score summary */}
+      {run.status === "complete" && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <div className="border rounded-lg p-4 bg-card">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Composite Score</p>
+            <p className="text-3xl font-semibold tabular-nums">
+              {(run.overall_score / 10).toFixed(4)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">{run.overall_score?.toFixed(1)} / 100</p>
+          </div>
+
+          {run.weakest_criterion && (
+            <div className="border border-amber-200 rounded-lg p-4 bg-amber-50 col-span-1 sm:col-span-2">
+              <div className="flex items-center gap-1.5 mb-1">
+                <TrendingDown className="w-3.5 h-3.5 text-amber-600" />
+                <p className="text-xs font-medium text-amber-700 uppercase tracking-wider">Weakest Criterion</p>
+              </div>
+              <p className="text-lg font-semibold text-amber-900">{run.weakest_criterion}</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                avg {run.weakest_criterion_score?.toFixed(1)} / 10 across {run.test_inputs_count} doc{run.test_inputs_count !== 1 ? "s" : ""}
+              </p>
+              {run.criterion_averages && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {Object.entries(run.criterion_averages).sort((a, b) => a[1] - b[1]).map(([name, score]) => (
+                    <span
+                      key={name}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${name === run.weakest_criterion ? "bg-amber-200 border-amber-300 text-amber-900 font-medium" : "bg-white border-border text-muted-foreground"}`}
+                    >
+                      {name}: {score.toFixed(1)}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {run.status === "running" || run.status === "pending" ? (
+        <div className="text-sm text-muted-foreground flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-foreground rounded-full animate-spin" />
+          Running evaluation...
+        </div>
+      ) : null}
 
       {/* Results table */}
       <div className="border rounded-lg overflow-hidden">

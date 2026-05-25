@@ -12,16 +12,13 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'eval_run_id required' }, { status: 400 });
   }
 
-  // Mark run as running
   await base44.asServiceRole.entities.EvalRun.update(eval_run_id, { status: 'running' });
 
   try {
-    // Load run data
     const runs = await base44.asServiceRole.entities.EvalRun.filter({ id: eval_run_id });
     const run = runs[0];
     if (!run) throw new Error('Run not found');
 
-    // Load prompt
     const prompts = await base44.asServiceRole.entities.Prompt.filter({ id: run.prompt_id });
     const prompt = prompts[0];
     if (!prompt) throw new Error('Prompt not found');
@@ -33,10 +30,8 @@ Deno.serve(async (req) => {
       promptText = await res.text();
     }
 
-    // Collect attached file URLs for vision/context
-    const attachedFileUrls = (prompt.attached_files || []).map(f => f.url);
+    const attachedFiles = prompt.attached_files || [];
 
-    // Load rubric and criteria
     const rubrics = await base44.asServiceRole.entities.Rubric.filter({ prompt_id: prompt.id });
     const rubric = rubrics[0];
     if (!rubric) throw new Error('Rubric not found');
@@ -44,37 +39,63 @@ Deno.serve(async (req) => {
     const criteria = await base44.asServiceRole.entities.RubricCriterion.filter({ rubric_id: rubric.id });
     if (criteria.length === 0) throw new Error('No criteria defined');
 
-    // Calculate normalized weights
     const totalWeight = criteria.reduce((sum, c) => sum + (c.weight || 0), 0);
     const normalizedWeights = {};
     for (const c of criteria) {
       normalizedWeights[c.name] = totalWeight > 0 ? (c.weight || 0) / totalWeight : 1 / criteria.length;
     }
 
-    // Load eval results (test inputs)
-    const results = await base44.asServiceRole.entities.EvalResult.filter({ eval_run_id });
-
     const allScores = [];
+    // criterionTotals: { [criterionName]: { total: number, count: number } }
+    const criterionTotals = {};
+    for (const c of criteria) {
+      criterionTotals[c.name] = { total: 0, count: 0 };
+    }
 
-    for (const result of results) {
-      // Call 1: Generate output
-      const generatePrompt = `You are completing a task. Follow the instructions in the prompt exactly.\n\n${promptText}\n\nInput: ${result.test_input}`;
+    // Each attached file is one test input
+    const testInputs = attachedFiles.length > 0 ? attachedFiles : [{ name: 'default', url: null }];
+
+    // Create EvalResult records for each test input
+    const evalResults = await Promise.all(
+      testInputs.map(async (file) => {
+        const result = await base44.asServiceRole.entities.EvalResult.create({
+          eval_run_id,
+          test_input: file.name,
+        });
+        return { result, file };
+      })
+    );
+
+    for (const { result, file } of evalResults) {
+      // Fetch reference doc content if available
+      let docContent = '';
+      if (file.url) {
+        try {
+          const docRes = await fetch(file.url);
+          docContent = await docRes.text();
+        } catch (_) {
+          docContent = `[Could not load: ${file.name}]`;
+        }
+      }
+
+      // Generate output
+      const generatePrompt = `You are completing a task. Follow the system prompt instructions exactly.\n\nSYSTEM PROMPT:\n${promptText}\n\n${docContent ? `REFERENCE DOCUMENT (${file.name}):\n${docContent}` : ''}`;
       const rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt: generatePrompt,
-        ...(attachedFileUrls.length > 0 ? { file_urls: attachedFileUrls } : {}),
       });
 
-      // Call 2: Score output against all criteria
+      // Score output against all criteria
       const criteriaList = criteria.map(c => `- ${c.name}: ${c.description}`).join('\n');
-      const scorePrompt = `You are an evaluator. Score the output below against each criterion listed. Return JSON only, no other text.
+      const scorePrompt = `You are an evaluator. Score the output below against each criterion. Each score is 0-10.
 
-Prompt used: ${promptText}
+SYSTEM PROMPT used:
+${promptText}
 
-Input: ${result.test_input}
+${docContent ? `REFERENCE DOCUMENT (${file.name}):\n${docContent}\n` : ''}
+OUTPUT to evaluate:
+${rawOutput}
 
-Output to evaluate: ${rawOutput}
-
-Criteria to score:
+CRITERIA:
 ${criteriaList}`;
 
       const scoreResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
@@ -99,7 +120,6 @@ ${criteriaList}`;
 
       const scores = scoreResult.scores || [];
 
-      // Save criterion scores
       const criterionScoreRecords = scores.map(s => ({
         eval_result_id: result.id,
         criterion_name: s.criterion_name,
@@ -111,13 +131,21 @@ ${criteriaList}`;
         await base44.asServiceRole.entities.CriterionScore.bulkCreate(criterionScoreRecords);
       }
 
-      // Calculate weighted score (0-100)
+      // Accumulate per-criterion totals
+      for (const s of scores) {
+        if (criterionTotals[s.criterion_name]) {
+          criterionTotals[s.criterion_name].total += Math.min(10, Math.max(0, s.score));
+          criterionTotals[s.criterion_name].count += 1;
+        }
+      }
+
+      // Weighted overall score (0-100)
       let overallScore = 0;
       for (const s of scores) {
         const weight = normalizedWeights[s.criterion_name] || 0;
         overallScore += Math.min(10, Math.max(0, s.score)) * weight;
       }
-      overallScore = overallScore * 10; // Convert 0-10 to 0-100
+      overallScore = overallScore * 10;
 
       const flagged = overallScore < (rubric.passing_threshold || 70);
 
@@ -130,7 +158,22 @@ ${criteriaList}`;
       allScores.push(overallScore);
     }
 
-    // Calculate run overall score
+    // Compute criterion averages
+    const criterionAverages = {};
+    for (const [name, { total, count }] of Object.entries(criterionTotals)) {
+      criterionAverages[name] = count > 0 ? Math.round((total / count) * 10) / 10 : 0;
+    }
+
+    // Find weakest criterion
+    let weakestCriterion = null;
+    let weakestScore = Infinity;
+    for (const [name, avg] of Object.entries(criterionAverages)) {
+      if (avg < weakestScore) {
+        weakestScore = avg;
+        weakestCriterion = name;
+      }
+    }
+
     const runOverallScore = allScores.length > 0
       ? allScores.reduce((a, b) => a + b, 0) / allScores.length
       : 0;
@@ -138,6 +181,10 @@ ${criteriaList}`;
     await base44.asServiceRole.entities.EvalRun.update(eval_run_id, {
       status: 'complete',
       overall_score: Math.round(runOverallScore * 10) / 10,
+      test_inputs_count: testInputs.length,
+      weakest_criterion: weakestCriterion,
+      weakest_criterion_score: weakestScore === Infinity ? null : weakestScore,
+      criterion_averages: criterionAverages,
     });
 
     return Response.json({ success: true, overall_score: runOverallScore });

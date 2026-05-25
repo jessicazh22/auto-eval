@@ -24,6 +24,18 @@
     "test_inputs_count": {
       "type": "number",
       "description": "Number of test inputs"
+    },
+    "weakest_criterion": {
+      "type": "string",
+      "description": "Name of the lowest-scoring criterion"
+    },
+    "weakest_criterion_score": {
+      "type": "number",
+      "description": "Average score of the weakest criterion (0-10)"
+    },
+    "criterion_averages": {
+      "type": "object",
+      "description": "Map of criterion name to average score across all results"
     }
   },
   "required": [
