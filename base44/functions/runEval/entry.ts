@@ -94,7 +94,6 @@ Deno.serve(async (req) => {
         : promptText;
       const rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt: generatePrompt,
-        add_context_from_internet: true,
       });
 
       // Score output against all criteria
