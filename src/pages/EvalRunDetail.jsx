@@ -52,22 +52,40 @@ export default function EvalRunDetail() {
   });
 
   const { data: parentRun } = useQuery({
-    queryKey: ["parent-run", variant?.parent_eval_run_id, run?.prompt_id],
-    queryFn: async () => {
-      if (variant?.parent_eval_run_id) {
-        const runs = await base44.entities.EvalRun.filter({ id: variant.parent_eval_run_id });
-        return runs[0] || null;
-      }
-      if (run?.prompt_id) {
-        const allRuns = await base44.entities.EvalRun.filter({ prompt_id: run.prompt_id });
-        const sorted = allRuns.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
-        const currentIndex = sorted.findIndex(r => r.id === runId);
-        return currentIndex > 0 ? sorted[currentIndex + 1] : null;
-      }
-      return null;
-    },
-    enabled: !!run?.prompt_id,
-  });
+     queryKey: ["parent-run", variant?.parent_eval_run_id, run?.prompt_id],
+     queryFn: async () => {
+       if (variant?.parent_eval_run_id) {
+         const runs = await base44.entities.EvalRun.filter({ id: variant.parent_eval_run_id });
+         return runs[0] || null;
+       }
+       if (run?.prompt_id) {
+         const allRuns = await base44.entities.EvalRun.filter({ prompt_id: run.prompt_id });
+         const sorted = allRuns.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+         const currentIndex = sorted.findIndex(r => r.id === runId);
+         return currentIndex > 0 ? sorted[currentIndex + 1] : null;
+       }
+       return null;
+     },
+     enabled: !!run?.prompt_id,
+   });
+
+   const { data: extractedChange } = useQuery({
+     queryKey: ["extracted-change", variant?.id],
+     queryFn: async () => {
+       if (!variant?.original_prompt_text || !variant?.improved_prompt_text) return null;
+       const origRes = await fetch(variant.original_prompt_text);
+       const origText = await origRes.text();
+       const improvRes = await fetch(variant.improved_prompt_text);
+       const improvText = await improvRes.text();
+
+       const origWords = origText.split(/\s+/).filter(w => w.length > 0);
+       const improvWords = improvText.split(/\s+/).filter(w => w.length > 0);
+
+       const added = improvWords.filter(w => !origWords.includes(w));
+       return added.slice(0, 5).join(" ");
+     },
+     enabled: !!variant?.original_prompt_text && !!variant?.improved_prompt_text,
+   });
 
   // Poll while running
   const isRunning = run?.status === "running" || run?.status === "pending";
@@ -229,9 +247,14 @@ export default function EvalRunDetail() {
             })}
           </div>
           {variant && (
-            <div className="border-t pt-3 text-xs">
-              <p className="text-muted-foreground mb-2">EXPERIMENT HYPOTHESIS</p>
-              <p className="text-sm">{variant.change_summary}</p>
+            <div className="border-t pt-3 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase">Experiment Hypothesis</p>
+              <p className="text-sm leading-relaxed">
+                If we <span className="font-semibold text-amber-600">add "{extractedChange}"</span>, then <span className="font-semibold text-green-600">{variant.target_criterion}</span> should improve because it provides clearer instruction.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Result: {variant.score_delta > 0 ? "✓ Improved" : variant.score_delta < 0 ? "✗ Declined" : "— No change"} ({variant.score_delta > 0 ? "+" : ""}{variant.score_delta?.toFixed(1)})
+              </p>
             </div>
           )}
         </div>
