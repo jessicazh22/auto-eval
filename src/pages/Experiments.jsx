@@ -142,7 +142,7 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }
               <Loader2 className="w-4 h-4 animate-spin" />
               Scoring…
             </div>
-          ) : variant.status === "complete" ? (
+          ) : variant.status === "complete" && variant.variant_score != null ? (
             <>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground mb-1">Before → After</p>
