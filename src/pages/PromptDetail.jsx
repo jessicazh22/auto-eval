@@ -201,7 +201,7 @@ export default function PromptDetail() {
             Run Eval
           </Button>
         </div>
-        <EvalRunsTable runs={runs} />
+        <EvalRunsTable runs={runs} promptId={promptId} />
       </section>
 
       {showRunModal && (

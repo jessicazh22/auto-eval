@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Trash2, Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -85,11 +86,11 @@ export default function RubricEditor({ rubric, criteria, onCriteriaChange }) {
                 placeholder="Criterion name"
                 className="font-medium text-sm h-8"
               />
-              <Input
+              <Textarea
                 value={criterion.description}
                 onChange={(e) => updateCriterion(i, "description", e.target.value)}
                 placeholder="What does this criterion evaluate?"
-                className="text-sm h-8 text-muted-foreground"
+                className="text-sm text-muted-foreground resize-none min-h-[72px]"
               />
               <div className="flex items-center gap-3">
                 <span className="text-xs text-muted-foreground w-12 shrink-0">Weight</span>
