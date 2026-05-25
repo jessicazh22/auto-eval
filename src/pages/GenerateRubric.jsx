@@ -10,8 +10,20 @@ import GeneratedRubricEditor from "@/components/rubric/GeneratedRubricEditor";
 import ExampleAnnotator from "@/components/rubric/ExampleAnnotator";
 
 const TABS = [
-  { id: "examples", label: "From Examples", description: "Annotate specific outputs to show what's good or bad" },
-  { id: "general", label: "General Description", description: "Describe what great output looks like in your own words" },
+  {
+    id: "examples",
+    label: "From Examples",
+    time: "~10 min",
+    when: "Use when you have real outputs you've already reviewed — paste or upload them with your reactions. Best rubric quality.",
+    description: "Paste or upload real outputs with your reactions — quote specific sentences that confused you or worked well",
+  },
+  {
+    id: "general",
+    label: "General Description",
+    time: "~2 min",
+    when: "Use when you're starting fresh or don't have examples yet. Good enough to start evaluating immediately.",
+    description: "Describe what failures look like and what a perfect output looks like — no examples needed",
+  },
 ];
 
 export default function GenerateRubric() {
@@ -201,16 +213,20 @@ export default function GenerateRubric() {
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tab.label}
+              <span>{tab.label}</span>
+              <span className={`ml-1.5 text-xs font-normal ${activeTab === tab.id ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
+                {tab.time}
+              </span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Tab description */}
-      <p className="text-sm text-muted-foreground -mt-4">
-        {TABS.find((t) => t.id === activeTab)?.description}
-      </p>
+      {/* Tab description + when to use */}
+      <div className="-mt-4 space-y-0.5">
+        <p className="text-sm text-muted-foreground">{TABS.find((t) => t.id === activeTab)?.description}</p>
+        <p className="text-xs text-muted-foreground/70">{TABS.find((t) => t.id === activeTab)?.when}</p>
+      </div>
 
       {/* Tab content */}
       {activeTab === "examples" ? (
