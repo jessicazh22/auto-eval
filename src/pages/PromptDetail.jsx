@@ -5,12 +5,12 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Play, Paperclip, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Loader2 } from "lucide-react";
 import debounce from "lodash/debounce";
 import RubricEditor from "@/components/prompt/RubricEditor";
 import EvalRunsTable from "@/components/prompt/EvalRunsTable";
 import RunEvalModal from "@/components/prompt/RunEvalModal";
-import TestInputManager from "@/components/prompt/TestInputManager";
+import ReferenceDocs from "@/components/prompt/ReferenceDocs";
 
 export default function PromptDetail() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -62,10 +62,8 @@ export default function PromptDetail() {
 
   const [localName, setLocalName] = useState("");
   const [localText, setLocalText] = useState("");
-  const [attachedFiles, setAttachedFiles] = useState([]); // [{name, url}]
-  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState([]);
   const [savingText, setSavingText] = useState(false);
-  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (prompt) {
@@ -111,28 +109,6 @@ export default function PromptDetail() {
     if (prompt) debouncedSaveText(prompt.id, value);
   };
 
-  const handleFileAttach = async (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    setUploadingFiles(true);
-    const uploaded = await Promise.all(
-      files.map(async (f) => {
-        const { file_url } = await base44.integrations.Core.UploadFile({ file: f });
-        return { name: f.name, url: file_url };
-      })
-    );
-    const newFiles = [...attachedFiles, ...uploaded];
-    setAttachedFiles(newFiles);
-    await base44.entities.Prompt.update(prompt.id, { attached_files: newFiles });
-    setUploadingFiles(false);
-    e.target.value = "";
-  };
-
-  const handleRemoveFile = async (index) => {
-    const newFiles = attachedFiles.filter((_, i) => i !== index);
-    setAttachedFiles(newFiles);
-    await base44.entities.Prompt.update(prompt.id, { attached_files: newFiles });
-  };
 
   if (loadingPrompt) {
     return (
@@ -183,39 +159,18 @@ export default function PromptDetail() {
           )}
         </div>
 
-        {/* Attached files */}
-        <div className="space-y-2">
-          {attachedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {attachedFiles.map((f, i) => (
-                <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-muted rounded-md text-xs text-muted-foreground">
-                  <Paperclip className="w-3 h-3" />
-                  <a href={f.url} target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors max-w-[180px] truncate">
-                    {f.name}
-                  </a>
-                  <button onClick={() => handleRemoveFile(i)} className="hover:text-destructive transition-colors ml-1">
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingFiles}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-          >
-            {uploadingFiles ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
-            {uploadingFiles ? "Uploading..." : "Attach files"}
-          </button>
-          <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileAttach} />
+        {/* Reference Docs */}
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Reference Docs</p>
+          <ReferenceDocs
+            attachedFiles={attachedFiles}
+            onFilesChange={async (newFiles) => {
+              setAttachedFiles(newFiles);
+              await base44.entities.Prompt.update(prompt.id, { attached_files: newFiles });
+            }}
+            promptId={promptId}
+          />
         </div>
-      </section>
-
-      {/* Section 2: Test Inputs */}
-      <section className="space-y-3">
-        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Test Inputs</h2>
-        <TestInputManager promptId={promptId} />
       </section>
 
       {/* Section 3: Rubric */}
