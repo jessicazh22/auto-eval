@@ -40,6 +40,24 @@ export default function GenerateRubric() {
     queryFn: () => base44.entities.Prompt.list("-created_date"),
   });
 
+  // Load saved annotations when prompt changes
+  const handlePromptChange = async (promptId) => {
+    setSelectedPromptId(promptId);
+    setGeneratedCriteria(null);
+    setSaved(false);
+    if (!promptId) return;
+    const rubrics = await base44.entities.Rubric.filter({ prompt_id: promptId });
+    const rubric = rubrics[0];
+    if (rubric?.annotation_text) {
+      setFeedbackText(rubric.annotation_text);
+      // Also restore guided fields if they're embedded in the text
+      const failureMatch = rubric.annotation_text.match(/Most common failure: (.+?)(?:\n\n|$)/s);
+      const successMatch = rubric.annotation_text.match(/What a perfect output looks like: (.+?)(?:\n\n|$)/s);
+      if (failureMatch) setCommonFailure(failureMatch[1].trim());
+      if (successMatch) setSuccessDescription(successMatch[1].trim());
+    }
+  };
+
   const handleGenerate = async () => {
     if (!selectedPromptId) return;
     setGenerating(true);
@@ -78,11 +96,38 @@ export default function GenerateRubric() {
 
   const handleSave = async (criteria) => {
     setSaving(true);
+
+    // Build the annotation text to persist
+    const savedAnnotationText = activeTab === "general"
+      ? [
+          commonFailure.trim() ? `Most common failure: ${commonFailure.trim()}` : "",
+          successDescription.trim() ? `What a perfect output looks like: ${successDescription.trim()}` : "",
+          feedbackText.trim(),
+        ].filter(Boolean).join("\n\n")
+      : examples.filter(e => e.text || e.file || e.annotation)
+          .map((e, i) => {
+            const content = e.file ? `[Attached file: ${e.file.name}]` : e.text || "(no content)";
+            return `Example ${i + 1}:\nOutput: ${content}\nFeedback: ${e.annotation || "(no comment)"}`;
+          }).join("\n\n");
+
+    const savedFileUrls = activeTab === "examples"
+      ? examples.filter(e => e.file?.url).map(e => e.file.url)
+      : [];
+
     const rubrics = await base44.entities.Rubric.filter({ prompt_id: selectedPromptId });
     let rubric = rubrics[0];
     if (!rubric) {
-      rubric = await base44.entities.Rubric.create({ prompt_id: selectedPromptId, passing_threshold: 70 });
+      rubric = await base44.entities.Rubric.create({
+        prompt_id: selectedPromptId,
+        passing_threshold: 70,
+        annotation_text: savedAnnotationText,
+        annotation_file_urls: savedFileUrls,
+      });
     } else {
+      await base44.entities.Rubric.update(rubric.id, {
+        annotation_text: savedAnnotationText,
+        annotation_file_urls: savedFileUrls,
+      });
       const existing = await base44.entities.RubricCriterion.filter({ rubric_id: rubric.id });
       await Promise.all(existing.map((c) => base44.entities.RubricCriterion.delete(c.id)));
     }
@@ -130,7 +175,7 @@ export default function GenerateRubric() {
         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Prompt</label>
         <Select
           value={selectedPromptId}
-          onValueChange={(v) => { setSelectedPromptId(v); setGeneratedCriteria(null); setSaved(false); }}
+          onValueChange={handlePromptChange}
         >
           <SelectTrigger className="w-full max-w-sm">
             <SelectValue placeholder="Select a prompt..." />

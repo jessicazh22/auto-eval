@@ -10,6 +10,15 @@
       "type": "number",
       "default": 70,
       "description": "Score threshold for passing (0-100)"
+    },
+    "annotation_text": {
+      "type": "string",
+      "description": "Raw annotation/feedback text used to generate this rubric — saved so it can be reloaded and reused"
+    },
+    "annotation_file_urls": {
+      "type": "array",
+      "description": "File URLs of annotated example outputs used during rubric generation",
+      "items": { "type": "string" }
     }
   },
   "required": [

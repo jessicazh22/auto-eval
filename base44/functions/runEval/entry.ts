@@ -39,6 +39,19 @@ Deno.serve(async (req) => {
     const criteria = await base44.asServiceRole.entities.RubricCriterion.filter({ rubric_id: rubric.id });
     if (criteria.length === 0) throw new Error('No criteria defined');
 
+    // Load gold standard from TestInput reference docs if available
+    let goldStandardText = '';
+    try {
+      const testInputs = await base44.asServiceRole.entities.TestInput.filter({ prompt_id: prompt.id });
+      const testInput = testInputs[0];
+      if (testInput?.reference_docs?.length > 0) {
+        const goldRes = await fetch(testInput.reference_docs[0].url);
+        goldStandardText = await goldRes.text();
+      }
+    } catch (_) {
+      // Gold standard is optional — continue without it
+    }
+
     const totalWeight = criteria.reduce((sum, c) => sum + (c.weight || 0), 0);
     const normalizedWeights = {};
     for (const c of criteria) {
@@ -103,8 +116,12 @@ Deno.serve(async (req) => {
 SYSTEM PROMPT used:
 ${promptText}
 
-${docContent ? `REFERENCE DOCUMENT (${file.name}):\n${docContent}\n` : ''}
-OUTPUT to evaluate:
+${docContent ? `REFERENCE DOCUMENT (${file.name}):\n${docContent}\n` : ''}${goldStandardText ? `GOLD STANDARD (ideal output — use this to calibrate your scores):
+${goldStandardText}
+
+An output matching the gold standard's quality and style should score 8-10. An output far from it should score 1-3.
+
+` : ''}OUTPUT to evaluate:
 ${rawOutput}
 
 CRITERIA:
