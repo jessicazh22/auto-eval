@@ -78,11 +78,18 @@ export default function EvalRunDetail() {
        const improvRes = await fetch(variant.improved_prompt_text);
        const improvText = await improvRes.text();
 
-       const origWords = origText.split(/\s+/).filter(w => w.length > 0);
-       const improvWords = improvText.split(/\s+/).filter(w => w.length > 0);
-
-       const added = improvWords.filter(w => !origWords.includes(w));
-       return added.slice(0, 5).join(" ");
+       // Find longest contiguous substring in improved that's not in original
+       const words = improvText.split(/\s+/).filter(w => w.length > 0);
+       let longest = "";
+       for (let i = 0; i < words.length; i++) {
+         for (let j = i + 1; j <= Math.min(i + 10, words.length); j++) {
+           const phrase = words.slice(i, j).join(" ");
+           if (!origText.includes(phrase) && phrase.length > longest.length) {
+             longest = phrase;
+           }
+         }
+       }
+       return longest || "changes";
      },
      enabled: !!variant?.original_prompt_text && !!variant?.improved_prompt_text,
    });
