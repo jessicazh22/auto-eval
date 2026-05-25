@@ -90,11 +90,11 @@ export default function EvalRunDetail() {
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-6">
       <button
-        onClick={() => navigate(prompt ? `/prompt/${prompt.id}` : "/")}
+        onClick={() => window.history.back()}
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
-        Back to {prompt?.name || "prompts"}
+        Back
       </button>
 
       {/* Top bar */}
