@@ -42,6 +42,24 @@ export default function EvalRunDetail() {
     initialData: [],
   });
 
+  const { data: variant } = useQuery({
+    queryKey: ["variant-for-run", runId],
+    queryFn: async () => {
+      const vars = await base44.entities.PromptVariant.filter({ variant_eval_run_id: runId });
+      return vars[0] || null;
+    },
+    enabled: !!runId,
+  });
+
+  const { data: parentRun } = useQuery({
+    queryKey: ["parent-run", variant?.parent_eval_run_id],
+    queryFn: async () => {
+      const runs = await base44.entities.EvalRun.filter({ id: variant.parent_eval_run_id });
+      return runs[0] || null;
+    },
+    enabled: !!variant?.parent_eval_run_id,
+  });
+
   // Poll while running
   const isRunning = run?.status === "running" || run?.status === "pending";
   useEffect(() => {
@@ -167,6 +185,34 @@ export default function EvalRunDetail() {
           Running evaluation...
         </div>
       ) : null}
+
+      {/* Comparison with parent run */}
+      {variant && parentRun && run.status === "complete" && (
+        <div className="border rounded-lg p-4 bg-card">
+          <h2 className="text-sm font-semibold mb-3">Criterion Comparison</h2>
+          <div className="grid grid-cols-2 gap-4 text-xs">
+            {Object.entries(run.criterion_averages || {}).map(([criterion, score]) => {
+              const parentScore = parentRun.criterion_averages?.[criterion] || 0;
+              const delta = score - parentScore;
+              return (
+                <div key={criterion} className="border rounded p-3 space-y-1">
+                  <p className="font-medium text-foreground">{criterion}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">{parentScore.toFixed(1)}</span>
+                    <span className="text-muted-foreground">→</span>
+                    <span className={delta > 0 ? "text-green-600 font-semibold" : delta < 0 ? "text-red-600 font-semibold" : ""}>{score.toFixed(1)}</span>
+                    {delta !== 0 && (
+                      <span className={`text-xs ${delta > 0 ? "text-green-600" : "text-red-600"}`}>
+                        ({delta > 0 ? "+" : ""}{delta.toFixed(1)})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Results table */}
       <div className="border rounded-lg overflow-hidden">
