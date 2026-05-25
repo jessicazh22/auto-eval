@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
   }
 
   // Ask LLM to make ONE targeted change
-  const improvementPrompt = `You are a prompt engineer. Your job is to improve an LLM system prompt by making exactly ONE targeted change.
+  const improvementPrompt = `You are a prompt engineer improving an LLM system prompt by making exactly ONE targeted change.
 
 CURRENT PROMPT:
 ${originalText}
@@ -57,13 +57,10 @@ ${criterionSummary}
 
 Weakest criterion: ${weakestCriterion}${annotationContext}
 
-YOUR TASK:
-1. Identify the single most impactful change you can make to improve "${weakestCriterion}"
-2. Make ONLY that one change — do not restructure or rewrite the whole prompt
-3. The change should directly address the weakness shown in the scores and annotations
+Make the single most impactful change to improve "${weakestCriterion}". Do not restructure or rewrite the whole prompt — only one targeted change.
 
 Return a JSON object with:
-- improved_prompt: the full improved prompt text (with only one targeted change applied)
+- improved_prompt: the full improved prompt text with only one targeted change applied (do NOT include any evaluation scores, task instructions, or meta-commentary in the prompt itself)
 - change_summary: a single sentence describing exactly what you changed and why (e.g. "Added explicit instruction to use plain language to improve clarity")
 - target_criterion: the criterion name this change targets`;
 

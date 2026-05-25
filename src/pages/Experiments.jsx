@@ -31,7 +31,7 @@ export default function Experiments() {
     if (!hasRunning) return;
     const interval = setInterval(async () => {
       for (const v of variants) {
-        if (v.status === "running" && v.variant_eval_run_id) {
+        if ((v.status === "running" || v.status === "generating") && v.variant_eval_run_id) {
           const runs = await base44.entities.EvalRun.filter({ id: v.variant_eval_run_id });
           const run = runs[0];
           if (run?.status === "complete") {
@@ -141,7 +141,7 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }
           {isRunning ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Scoring...
+              Scoring…
             </div>
           ) : variant.status === "complete" ? (
             <>
@@ -154,12 +154,9 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }
                   <DeltaBadge delta={delta} />
                 </div>
               </div>
-              <button
-                onClick={onViewRun}
-                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
-              >
-                View run →
-              </button>
+              <Button size="sm" variant="outline" onClick={onViewRun} className="text-xs">
+                View results
+              </Button>
             </>
           ) : variant.status === "failed" ? (
             <span className="text-xs text-destructive">Failed</span>
