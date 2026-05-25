@@ -1,14 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { TrendingUp, TrendingDown, Minus, Loader2 } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Loader2, Plus } from "lucide-react";
 import ScoreBadge from "@/components/shared/ScoreBadge";
 import PromptDiffViewer from "@/components/variant/PromptDiffViewer";
+import NewExperimentModal from "@/components/experiments/NewExperimentModal";
+import VariantActionBar from "@/components/experiments/VariantActionBar";
+import { Button } from "@/components/ui/button";
 
 export default function Experiments() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [showNew, setShowNew] = useState(false);
 
   const { data: variants = [], isLoading } = useQuery({
     queryKey: ["all-variants"],
@@ -49,10 +53,25 @@ export default function Experiments() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Experiments</h1>
-        <p className="text-sm text-muted-foreground mt-1">All prompt improvement attempts across every prompt.</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Experiments</h1>
+          <p className="text-sm text-muted-foreground mt-1">All prompt improvement attempts across every prompt.</p>
+        </div>
+        <Button size="sm" className="gap-1.5" onClick={() => setShowNew(true)}>
+          <Plus className="w-3.5 h-3.5" />
+          New Experiment
+        </Button>
       </div>
+
+      <NewExperimentModal
+        open={showNew}
+        onClose={() => setShowNew(false)}
+        onStarted={() => {
+          setShowNew(false);
+          queryClient.invalidateQueries({ queryKey: ["all-variants"] });
+        }}
+      />
 
       {isLoading && (
         <div className="flex justify-center py-16">
@@ -76,6 +95,7 @@ export default function Experiments() {
               promptName={prompt?.name}
               onViewPrompt={() => navigate(`/prompt/${v.prompt_id}`)}
               onViewRun={() => navigate(`/run/${v.variant_eval_run_id}`)}
+              onApplied={() => queryClient.invalidateQueries({ queryKey: ["all-variants"] })}
             />
           );
         })}
@@ -84,7 +104,7 @@ export default function Experiments() {
   );
 }
 
-function VariantCard({ variant, promptName, onViewPrompt, onViewRun }) {
+function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }) {
   const delta = variant.score_delta;
   const isRunning = variant.status === "running" || variant.status === "generating";
 
@@ -152,6 +172,10 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun }) {
           originalUrl={variant.original_prompt_text}
           improvedUrl={variant.improved_prompt_text}
         />
+      )}
+
+      {variant.status === "complete" && (
+        <VariantActionBar variant={variant} onActioned={onApplied} />
       )}
     </div>
   );

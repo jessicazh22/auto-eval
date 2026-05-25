@@ -5,7 +5,7 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { eval_run_id, annotations } = await req.json();
+  const { eval_run_id, annotations, target_criterion_override } = await req.json();
   if (!eval_run_id) return Response.json({ error: 'eval_run_id required' }, { status: 400 });
 
   // Fetch the run and prompt
@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
 
   // Build criterion context
   const criterionAverages = run.criterion_averages || {};
-  const weakestCriterion = run.weakest_criterion || 'overall quality';
+  const weakestCriterion = target_criterion_override || run.weakest_criterion || 'overall quality';
   const criterionSummary = Object.entries(criterionAverages)
     .sort((a, b) => a[1] - b[1])
     .map(([name, score]) => `- ${name}: ${score}/10`)
