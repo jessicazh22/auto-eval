@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -20,6 +20,8 @@ export default function GenerateRubric() {
 
   const [activeTab, setActiveTab] = useState("examples");
   const [selectedPromptId, setSelectedPromptId] = useState("");
+  const [savingExamples, setSavingExamples] = useState(false);
+  const saveExamplesTimer = useRef(null);
 
   // Examples mode state
   const [examples, setExamples] = useState([{ text: "", file: null, annotation: "" }]);
@@ -37,6 +39,28 @@ export default function GenerateRubric() {
     queryKey: ["prompts"],
     queryFn: () => base44.entities.Prompt.list("-created_date"),
   });
+
+  // Load saved examples when prompt is selected
+  useEffect(() => {
+    if (!selectedPromptId) return;
+    const prompt = prompts.find((p) => p.id === selectedPromptId);
+    if (prompt?.rubric_examples?.length > 0) {
+      setExamples(prompt.rubric_examples);
+    } else {
+      setExamples([{ text: "", file: null, annotation: "" }]);
+    }
+  }, [selectedPromptId, prompts]);
+
+  // Auto-save examples to prompt entity (debounced)
+  const handleExamplesChange = (updated) => {
+    setExamples(updated);
+    clearTimeout(saveExamplesTimer.current);
+    setSavingExamples(true);
+    saveExamplesTimer.current = setTimeout(async () => {
+      await base44.entities.Prompt.update(selectedPromptId, { rubric_examples: updated });
+      setSavingExamples(false);
+    }, 1000);
+  };
 
   const handleGenerate = async () => {
     if (!selectedPromptId) return;
@@ -162,7 +186,18 @@ export default function GenerateRubric() {
 
       {/* Tab content */}
       {activeTab === "examples" ? (
-        <ExampleAnnotator examples={examples} onChange={setExamples} />
+        <div className="space-y-2">
+          {selectedPromptId && (
+            <div className="flex justify-end h-4">
+              {savingExamples && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Saving...
+                </span>
+              )}
+            </div>
+          )}
+          <ExampleAnnotator examples={examples} onChange={selectedPromptId ? handleExamplesChange : setExamples} />
+        </div>
       ) : (
         <Textarea
           value={feedbackText}

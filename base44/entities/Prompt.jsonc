@@ -24,6 +24,35 @@
           }
         }
       }
+    },
+    "rubric_examples": {
+      "type": "array",
+      "description": "Annotated examples used for rubric generation",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "annotation": {
+            "type": "string"
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "required": [
