@@ -126,6 +126,11 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
               {variant.source === "annotations" ? "From Annotations" : "A/B Tweak"}
             </span>
+            {variant.strategy && (
+              <span className="text-xs px-2 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200 capitalize">
+                {variant.strategy}
+              </span>
+            )}
             {variant.target_criterion && (
               <span className="text-xs text-muted-foreground">
                 targeting <span className="font-medium text-foreground">{variant.target_criterion}</span>
@@ -156,14 +161,35 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
             </div>
           ) : variant.status === "complete" ? (
             <>
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground mb-1">Before → After</p>
-                <div className="flex items-center gap-2">
+              <div className="text-right space-y-2">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Before → After</p>
+                  <div className="flex items-center gap-2">
                     <ScoreBadge score={variant.original_score} size="sm" />
                     <span className="text-muted-foreground">→</span>
                     <ScoreBadge score={variant.variant_score} size="sm" />
                     <DeltaBadge delta={delta} />
                   </div>
+                </div>
+                {variant.per_criterion_delta && Object.keys(variant.per_criterion_delta).length > 0 && (
+                  <div className="flex flex-wrap gap-1 justify-end">
+                    {Object.entries(variant.per_criterion_delta).map(([criterion, d]) => {
+                      const isRegression = d < -1.0;
+                      const isImproved = d > 0;
+                      const chipClass = isRegression
+                        ? "bg-red-100 text-red-700 border-red-200"
+                        : isImproved
+                        ? "bg-green-100 text-green-700 border-green-200"
+                        : "bg-amber-50 text-amber-700 border-amber-200";
+                      return (
+                        <span key={criterion} className={`text-xs px-1.5 py-0.5 rounded border ${chipClass}`}>
+                          {criterion} {d > 0 ? "+" : ""}{d.toFixed(1)}
+                          {isRegression && " ⚠"}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               {variant.variant_eval_run_id && (
                 <Button size="sm" variant="outline" onClick={onViewRun} className="text-xs">
@@ -173,6 +199,8 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
             </>
           ) : variant.status === "failed" ? (
             <span className="text-xs text-destructive">Failed</span>
+          ) : variant.status === "rejected" ? (
+            <span className="text-xs text-muted-foreground italic">Discarded</span>
           ) : null}
           <Button
             size="icon"
