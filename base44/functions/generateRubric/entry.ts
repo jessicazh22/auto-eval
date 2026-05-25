@@ -26,37 +26,42 @@ Deno.serve(async (req) => {
     promptText = await res.text();
   }
 
-  const aiPrompt = `You are an expert evaluator helping to design rubric criteria for an LLM prompt.
+  const hasExamples = file_urls && file_urls.length > 0;
+  const hasFeedback = feedback_text && feedback_text.trim().length > 0;
 
-Prompt being evaluated:
+  const aiPrompt = `You are an expert evaluator designing a scoring rubric for an LLM prompt.
+
+SYSTEM PROMPT being evaluated:
 """
 ${promptText}
 """
 
-User feedback and expectations:
+${hasFeedback ? `USER FEEDBACK AND ANNOTATED EXAMPLES:
 """
-${feedback_text || 'No specific feedback provided. Use the prompt content to infer sensible criteria.'}
+${feedback_text}
 """
 
-Based on the prompt and feedback above, generate a rubric with 3-6 evaluation criteria. Each criterion should be specific, measurable, and directly relevant to what makes the prompt's output good or bad.
+${hasExamples ? `The attached files contain the actual LLM outputs referenced above. Read them carefully to identify concrete patterns that distinguish good from bad outputs for this specific task.` : ''}` : `No feedback provided. Infer sensible criteria from the prompt's purpose.`}
 
-Return a JSON object with this exact structure:
-{
-  "criteria": [
-    {
-      "name": "Short criterion name",
-      "description": "Detailed description of what this criterion measures and how to evaluate it",
-      "weight": 0.2
-    }
-  ]
-}
+YOUR TASK:
+Generate 3-6 evaluation criteria. For each criterion, write a description that includes:
+1. A one-sentence definition of what it measures
+2. Score 1-3 anchor: what a bad output looks like — use specific language patterns or failure modes from the examples if available
+3. Score 4-7 anchor: what an acceptable but imperfect output looks like
+4. Score 8-10 anchor: what an excellent output looks like — use specific language patterns from the examples if available
 
-Rules:
-- Weights must sum to exactly 1.0
-- Each weight should be between 0.05 and 0.5
-- Names should be 2-4 words maximum
-- Descriptions should be 1-2 sentences, clear and actionable
-- Focus on what actually matters for this specific prompt's purpose`;
+Format each description exactly like this:
+"Measures whether [what it evaluates]. Score 1-3: [concrete bad anchor]. Score 4-7: [concrete mid anchor]. Score 8-10: [concrete good anchor]."
+
+RULES:
+- Each criterion is UNIDIMENSIONAL: it measures exactly ONE aspect. If two criteria would always move together (e.g. "Clarity" and "Readability"), merge them into one.
+- Anchors must be concrete and observable. Never use vague words like "good" or "clear" without defining what they mean in this context.
+- If annotated examples are provided, ground your anchors in actual output patterns you observe — quote short phrases where helpful.
+- Weights reflect importance to the prompt's core purpose. The most critical criterion gets the highest weight.
+- Names: 2-4 words maximum.
+- Weights must sum to exactly 1.0, each between 0.05 and 0.5.
+
+Return JSON: { "criteria": [{ "name": "...", "description": "...", "weight": 0.0 }] }`;
 
   const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
     prompt: aiPrompt,

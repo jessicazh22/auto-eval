@@ -26,6 +26,8 @@ export default function GenerateRubric() {
 
   // General mode state
   const [feedbackText, setFeedbackText] = useState("");
+  const [commonFailure, setCommonFailure] = useState("");
+  const [successDescription, setSuccessDescription] = useState("");
 
   // Shared result state
   const [generating, setGenerating] = useState(false);
@@ -58,7 +60,11 @@ export default function GenerateRubric() {
       feedback_text = parts.join("\n\n");
       file_urls = examples.filter((e) => e.file?.url).map((e) => e.file.url);
     } else {
-      feedback_text = feedbackText;
+      const parts = [];
+      if (commonFailure.trim()) parts.push(`Most common failure: ${commonFailure.trim()}`);
+      if (successDescription.trim()) parts.push(`What a perfect output looks like: ${successDescription.trim()}`);
+      if (feedbackText.trim()) parts.push(feedbackText.trim());
+      feedback_text = parts.join("\n\n");
     }
 
     const res = await base44.functions.invoke("generateRubric", {
@@ -97,8 +103,9 @@ export default function GenerateRubric() {
   };
 
   const canGenerate = !!selectedPromptId && (
-    activeTab === "general" ? !!feedbackText.trim() :
-    examples.some((e) => e.text || e.file)
+    activeTab === "general"
+      ? !!(commonFailure.trim() || successDescription.trim() || feedbackText.trim())
+      : examples.some((e) => e.text || e.file)
   );
 
   return (
@@ -164,12 +171,54 @@ export default function GenerateRubric() {
       {activeTab === "examples" ? (
         <ExampleAnnotator examples={examples} onChange={setExamples} />
       ) : (
-        <Textarea
-          value={feedbackText}
-          onChange={(e) => setFeedbackText(e.target.value)}
-          placeholder="Describe what a good output looks like, what you want to avoid, specific qualities that matter, etc."
-          className="min-h-[160px] text-sm resize-y"
-        />
+        <div className="space-y-5">
+          {/* Quality indicator */}
+          {(() => {
+            const score = (commonFailure.trim() ? 1 : 0) + (successDescription.trim() ? 1 : 0);
+            const levels = [
+              { label: "Basic", color: "text-orange-500", bg: "bg-orange-50 border-orange-200", tip: "Add a failure description for better anchors." },
+              { label: "Good", color: "text-yellow-600", bg: "bg-yellow-50 border-yellow-200", tip: "Add a success description to complete the picture." },
+              { label: "Best", color: "text-green-600", bg: "bg-green-50 border-green-200", tip: "Great — rubric will have concrete anchors for both ends of the scale." },
+            ];
+            const level = levels[score];
+            return (
+              <div className={`flex items-start gap-2 px-3 py-2 rounded-md border text-xs ${level.bg}`}>
+                <span className={`font-semibold ${level.color}`}>Rubric quality: {level.label}</span>
+                <span className="text-muted-foreground">— {level.tip}</span>
+              </div>
+            );
+          })()}
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">What's the most common failure you see in current outputs? <span className="text-muted-foreground">(most valuable)</span></label>
+            <Textarea
+              value={commonFailure}
+              onChange={(e) => setCommonFailure(e.target.value)}
+              placeholder="e.g. The output adds claims not in the source document, or uses jargon the reader won't understand"
+              className="min-h-[80px] text-sm resize-y"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">What does a perfect output look like? <span className="text-muted-foreground">(optional)</span></label>
+            <Textarea
+              value={successDescription}
+              onChange={(e) => setSuccessDescription(e.target.value)}
+              placeholder="e.g. A 3-sentence summary that covers the main event, uses plain language, and cites only facts from the article"
+              className="min-h-[80px] text-sm resize-y"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">Anything else? <span className="text-muted-foreground">(optional)</span></label>
+            <Textarea
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              placeholder="Any other specific qualities that matter, edge cases, or things to avoid"
+              className="min-h-[60px] text-sm resize-y"
+            />
+          </div>
+        </div>
       )}
 
       {/* Generate button */}
