@@ -214,7 +214,7 @@ export default function GenerateRubric() {
               }`}
             >
               <span>{tab.label}</span>
-              <span className={`ml-1.5 text-xs font-normal ${activeTab === tab.id ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
+              <span className={`ml-1.5 text-[10px] font-normal ${activeTab === tab.id ? "text-muted-foreground/60" : "text-muted-foreground/40"}`}>
                 {tab.time}
               </span>
             </button>
@@ -222,11 +222,10 @@ export default function GenerateRubric() {
         </div>
       </div>
 
-      {/* Tab description + when to use */}
-      <div className="-mt-4 space-y-0.5">
-        <p className="text-sm text-muted-foreground">{TABS.find((t) => t.id === activeTab)?.description}</p>
-        <p className="text-xs text-muted-foreground/70">{TABS.find((t) => t.id === activeTab)?.when}</p>
-      </div>
+      {/* Tab description */}
+      <p className="text-sm text-muted-foreground -mt-4">
+        {TABS.find((t) => t.id === activeTab)?.description}
+      </p>
 
       {/* Tab content */}
       {activeTab === "examples" ? (
