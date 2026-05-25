@@ -53,6 +53,10 @@
           }
         }
       }
+    },
+    "general_description": {
+      "type": "string",
+      "description": "General comments and description for rubric generation"
     }
   },
   "required": [

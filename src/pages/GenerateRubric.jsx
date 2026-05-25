@@ -5,7 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Sparkles, ArrowLeft, Check } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft, Check, Info, Save } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import GeneratedRubricEditor from "@/components/rubric/GeneratedRubricEditor";
 import ExampleAnnotator from "@/components/rubric/ExampleAnnotator";
 
@@ -29,6 +30,8 @@ export default function GenerateRubric() {
 
   // General mode state
   const [feedbackText, setFeedbackText] = useState("");
+  const [savingDescription, setSavingDescription] = useState(false);
+  const [savedDescription, setSavedDescription] = useState(false);
 
   // Shared result state
   const [generating, setGenerating] = useState(false);
@@ -41,7 +44,7 @@ export default function GenerateRubric() {
     queryFn: () => base44.entities.Prompt.list("-created_date"),
   });
 
-  // Load saved examples when prompt is selected
+  // Load saved examples + general description when prompt is selected
   useEffect(() => {
     if (!selectedPromptId) return;
     const prompt = prompts.find((p) => p.id === selectedPromptId);
@@ -50,6 +53,8 @@ export default function GenerateRubric() {
     } else {
       setExamples([{ text: "", file: null, annotation: "" }]);
     }
+    setFeedbackText(prompt?.general_description || "");
+    setSavedDescription(false);
   }, [selectedPromptId, prompts]);
 
   // Keep ref in sync so onSave always has latest value
@@ -212,19 +217,62 @@ export default function GenerateRubric() {
           />
         </div>
       ) : (
-        <Textarea
-          value={feedbackText}
-          onChange={(e) => setFeedbackText(e.target.value)}
-          placeholder="Describe what a good output looks like, what you want to avoid, specific qualities that matter, etc."
-          className="min-h-[160px] text-sm resize-y"
-        />
+        <div className="space-y-3">
+          <Textarea
+            value={feedbackText}
+            onChange={(e) => { setFeedbackText(e.target.value); setSavedDescription(false); }}
+            placeholder="Describe what a good output looks like, what you want to avoid, specific qualities that matter, etc."
+            className="min-h-[160px] text-sm resize-y"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!selectedPromptId || savingDescription || savedDescription}
+            onClick={async () => {
+              setSavingDescription(true);
+              await base44.entities.Prompt.update(selectedPromptId, { general_description: feedbackText });
+              setSavingDescription(false);
+              setSavedDescription(true);
+            }}
+            className="gap-1.5"
+          >
+            {savingDescription ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...</>
+            ) : savedDescription ? (
+              <><Check className="w-3.5 h-3.5" /> Saved</>
+            ) : (
+              <><Save className="w-3.5 h-3.5" /> Save Comments</>
+            )}
+          </Button>
+        </div>
       )}
 
       {/* Generate button */}
-      <Button onClick={handleGenerate} disabled={!canGenerate || generating} className="gap-2">
-        {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-        {generating ? "Generating rubric..." : "Generate Rubric"}
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button onClick={handleGenerate} disabled={!canGenerate || generating} className="gap-2">
+          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {generating ? "Generating rubric..." : "Generate Rubric"}
+        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button className="text-muted-foreground hover:text-foreground transition-colors">
+                <Info className="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-xs text-xs space-y-1.5 p-3">
+              <p className="font-semibold text-sm">What makes a good rubric?</p>
+              <ul className="space-y-1 list-disc list-inside text-muted-foreground">
+                <li><span className="text-foreground font-medium">Specific:</span> Each criterion should target one observable trait, not a vague feeling.</li>
+                <li><span className="text-foreground font-medium">Diverse examples:</span> Mix good and bad outputs and explain exactly why each is good or bad.</li>
+                <li><span className="text-foreground font-medium">Cover edge cases:</span> Include examples of tricky or boundary-pushing inputs.</li>
+                <li><span className="text-foreground font-medium">Weighted correctly:</span> Assign higher weight to what matters most for your prompt's goal.</li>
+                <li><span className="text-foreground font-medium">3–5 examples</span> is a good starting point; add more only to cover gaps.</li>
+              </ul>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
 
       {/* Generated rubric */}
       {generatedCriteria && (
