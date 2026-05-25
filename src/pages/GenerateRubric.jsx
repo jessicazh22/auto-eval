@@ -79,21 +79,21 @@ export default function GenerateRubric() {
     setGeneratedCriteria(null);
     setSaved(false);
 
-    let feedback_text = "";
-    let file_urls = [];
+    // Combine both sources
+    const parts = examples
+      .filter((e) => e.text || e.file || e.annotation)
+      .map((e, i) => {
+        const content = e.file ? `[Attached file: ${e.file.name}]` : e.text || "(no content)";
+        const comment = e.annotation || "(no comment)";
+        return `Example ${i + 1}:\nOutput: ${content}\nFeedback: ${comment}`;
+      });
+    const file_urls = examples.filter((e) => e.file?.url).map((e) => e.file.url);
 
-    if (activeTab === "examples") {
-      const parts = examples
-        .filter((e) => e.text || e.file || e.annotation)
-        .map((e, i) => {
-          const content = e.file ? `[Attached file: ${e.file.name}]` : e.text || "(no content)";
-          const comment = e.annotation || "(no comment)";
-          return `Example ${i + 1}:\nOutput: ${content}\nFeedback: ${comment}`;
-        });
-      feedback_text = parts.join("\n\n");
-      file_urls = examples.filter((e) => e.file?.url).map((e) => e.file.url);
-    } else {
-      feedback_text = feedbackText;
+    let feedback_text = parts.join("\n\n");
+    if (feedbackText.trim()) {
+      feedback_text = feedback_text
+        ? `${feedback_text}\n\nGeneral description:\n${feedbackText}`
+        : `General description:\n${feedbackText}`;
     }
 
     const res = await base44.functions.invoke("generateRubric", {
@@ -158,8 +158,7 @@ Respond in JSON with:
   };
 
   const canGenerate = !!selectedPromptId && (
-    activeTab === "general" ? !!feedbackText.trim() :
-    examples.some((e) => e.text || e.file)
+    examples.some((e) => e.text || e.file) || !!feedbackText.trim()
   );
 
   return (
@@ -264,6 +263,10 @@ Respond in JSON with:
               setSavingExamples(false);
             } : undefined}
           />
+          <Button onClick={handleGenerate} disabled={!canGenerate || generating} className="gap-2 mt-2">
+            {generating && <Loader2 className="w-4 h-4 animate-spin" />}
+            {generating ? "Generating rubric..." : "Generate Rubric"}
+          </Button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -295,12 +298,6 @@ Respond in JSON with:
           </Button>
         </div>
       )}
-
-      {/* Generate button */}
-      <Button onClick={handleGenerate} disabled={!canGenerate || generating} className="gap-2">
-        {generating && <Loader2 className="w-4 h-4 animate-spin" />}
-        {generating ? "Generating rubric..." : "Generate Rubric"}
-      </Button>
 
       {/* Generated rubric */}
       {generatedCriteria && (
