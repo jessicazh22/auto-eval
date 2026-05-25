@@ -154,9 +154,11 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied }
                   <DeltaBadge delta={delta} />
                 </div>
               </div>
-              <Button size="sm" variant="outline" onClick={onViewRun} className="text-xs">
-                View results
-              </Button>
+              {variant.variant_eval_run_id && (
+                <Button size="sm" variant="outline" onClick={onViewRun} className="text-xs">
+                  View results
+                </Button>
+              )}
             </>
           ) : variant.status === "failed" ? (
             <span className="text-xs text-destructive">Failed</span>
