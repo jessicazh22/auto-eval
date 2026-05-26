@@ -54,13 +54,36 @@
       "type": "number",
       "description": "variant_score - original_score"
     },
+    "strategy": {
+      "type": "string",
+      "enum": ["rule", "example", "restructure"],
+      "description": "The improvement strategy used to generate this variant"
+    },
+    "why_this_helps": {
+      "type": "string",
+      "description": "2-sentence explanation linking the change to a specific failing output"
+    },
+    "sample_output": {
+      "type": "string",
+      "description": "Quick preview output from 1 run, shown before user approves full eval"
+    },
+    "per_criterion_delta": {
+      "type": "object",
+      "description": "criterion name → delta vs parent run (computed after full eval)"
+    },
+    "improvement_batch_id": {
+      "type": "string",
+      "description": "Links the 3 variants generated from one Improve Prompt click"
+    },
     "status": {
       "type": "string",
       "enum": [
         "generating",
+        "pending_approval",
         "running",
         "complete",
-        "failed"
+        "failed",
+        "rejected"
       ],
       "default": "generating"
     }

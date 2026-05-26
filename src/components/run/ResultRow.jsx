@@ -65,9 +65,14 @@ export default function ResultRow({ result, index }) {
           <ScoreBadge score={result.overall_score} />
         </TableCell>
         <TableCell>
-          {result.flagged && (
-            <AlertTriangle className="w-4 h-4 text-red-500" />
-          )}
+          <div className="flex items-center gap-1">
+            {result.flagged && <AlertTriangle className="w-4 h-4 text-red-500" />}
+            {result.skip_detected && (
+              <span title="LLM skipped — output was retried" className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 font-medium">
+                retried
+              </span>
+            )}
+          </div>
         </TableCell>
       </TableRow>
 

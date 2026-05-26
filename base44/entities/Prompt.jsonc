@@ -10,6 +10,10 @@
       "type": "string",
       "description": "URL to the uploaded prompt text file"
     },
+    "gold_standard_url": {
+      "type": "string",
+      "description": "URL to an ideal output file used to calibrate the eval judge"
+    },
     "attached_files": {
       "type": "array",
       "description": "List of attached files with name and url",

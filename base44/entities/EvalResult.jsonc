@@ -22,6 +22,11 @@
       "type": "boolean",
       "default": false,
       "description": "Whether this result is below passing threshold"
+    },
+    "skip_detected": {
+      "type": "boolean",
+      "default": false,
+      "description": "LLM refused or skipped generation — output was retried"
     }
   },
   "required": [

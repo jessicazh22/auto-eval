@@ -1,5 +1,37 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+const SKIP_PATTERNS = [
+  /couldn't find.*content/i,
+  /could not find.*content/i,
+  /no.*sourced content/i,
+  /skipping/i,
+  /nothing to report/i,
+  /no content.*today/i,
+  /unable to find.*content/i,
+  /no.*brief.*today/i,
+  /unable to browse/i,
+  /cannot browse/i,
+  /don't have.*ability to browse/i,
+  /do not have.*ability to browse/i,
+  /unable to access.*web/i,
+  /cannot access.*internet/i,
+  /cannot access.*web/i,
+  /I cannot provide.*brief/i,
+  /I'm unable to provide/i,
+  /I am unable to provide/i,
+  /real.?time.*updates/i,
+  /live updates/i,
+  /check reliable news sources/i,
+];
+
+function isSkipOutput(output: string): boolean {
+  const trimmed = output.trim();
+  // Too short — fewer than 3 paragraph breaks or under 400 chars is almost certainly a refusal or stub
+  const paragraphs = trimmed.split(/\n\n+/).filter(p => p.trim().length > 0);
+  if (trimmed.length < 400 || paragraphs.length < 3) return true;
+  return SKIP_PATTERNS.some(p => p.test(trimmed));
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
@@ -23,14 +55,19 @@ Deno.serve(async (req) => {
     const prompt = prompts[0];
     if (!prompt) throw new Error('Prompt not found');
 
-    // Fetch prompt text (stored as file URL), unless overridden
+    // Fetch prompt text — resolve URL whether from override or stored field
     let promptText = prompt_text_override || prompt.prompt_text || '';
-    if (!prompt_text_override && promptText.startsWith('http')) {
+    if (promptText.startsWith('http')) {
       const res = await fetch(promptText);
       promptText = await res.text();
     }
 
-    const attachedFiles = prompt.attached_files || [];
+    if (!promptText.trim()) {
+      await base44.asServiceRole.entities.EvalRun.update(eval_run_id, { status: 'failed' });
+      return Response.json({ error: 'Prompt text is empty' }, { status: 400 });
+    }
+
+    const attachedFiles = (prompt.attached_files || []).filter((f: any) => f.name !== '__gold_standard__');
 
     const rubrics = await base44.asServiceRole.entities.Rubric.filter({ prompt_id: prompt.id });
     const rubric = rubrics[0];
@@ -39,18 +76,16 @@ Deno.serve(async (req) => {
     const criteria = await base44.asServiceRole.entities.RubricCriterion.filter({ rubric_id: rubric.id });
     if (criteria.length === 0) throw new Error('No criteria defined');
 
-    // Load gold standard from TestInput reference docs if available
+    // Gold standard stored as special entry in attached_files
+    const GOLD_MARKER = '__gold_standard__';
     let goldStandardText = '';
     try {
-      const testInputs = await base44.asServiceRole.entities.TestInput.filter({ prompt_id: prompt.id });
-      const testInput = testInputs[0];
-      if (testInput?.reference_docs?.length > 0) {
-        const goldRes = await fetch(testInput.reference_docs[0].url);
+      const goldEntry = (prompt.attached_files || []).find((f: any) => f.name === GOLD_MARKER);
+      if (goldEntry?.url) {
+        const goldRes = await fetch(goldEntry.url);
         goldStandardText = await goldRes.text();
       }
-    } catch (_) {
-      // Gold standard is optional — continue without it
-    }
+    } catch (_) {}
 
     const totalWeight = criteria.reduce((sum, c) => sum + (c.weight || 0), 0);
     const normalizedWeights = {};
@@ -101,13 +136,26 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Generate output: system prompt defines the task, reference doc is the input
+      // System prompt = task instructions, user turn = reference doc to process
       const generatePrompt = docContent
-        ? `${promptText}\n\n---\n\n${docContent}`
+        ? `<system>\n${promptText}\n</system>\n\n<user>\n${docContent}\n</user>`
         : promptText;
-      const rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      let rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt: generatePrompt,
       });
+
+      let skipDetected = false;
+      if (isSkipOutput(rawOutput)) {
+        skipDetected = true;
+        // Retry with an explicit instruction to use the provided document only
+        const retrySystemAddendum = `\n\nCRITICAL: You have been given the source content directly in this message. You do NOT need to browse the internet or access any external URLs. Generate the output using ONLY the content provided below. Do not refuse, skip, or say you cannot access the web.`;
+        const retryPrompt = docContent
+          ? `<system>\n${promptText}${retrySystemAddendum}\n</system>\n\n<user>\n${docContent}\n</user>`
+          : `${promptText}${retrySystemAddendum}`;
+        rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
+          prompt: retryPrompt,
+        });
+      }
 
       // Score output against all criteria
       const criteriaList = criteria.map(c => `- ${c.name}: ${c.description}`).join('\n');
@@ -182,6 +230,7 @@ ${criteriaList}`;
         raw_output: rawOutput,
         overall_score: Math.round(overallScore * 10) / 10,
         flagged,
+        skip_detected: skipDetected,
       });
 
       allScores.push(overallScore);

@@ -3,19 +3,25 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import ScoreBadge from "@/components/shared/ScoreBadge";
 import StatusBadge from "@/components/shared/StatusBadge";
 import ResultRow from "@/components/run/ResultRow";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, TrendingDown, Sparkles, GitBranch, Loader2 } from "lucide-react";
+import { ArrowLeft, TrendingDown, Sparkles, Loader2, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import CriterionComparison from "@/components/variant/CriterionComparison";
 
-import { format } from "date-fns";
+const STRATEGY_LABELS = { rule: "Rule", example: "Example", restructure: "Restructure" };
+const STRATEGY_COLORS = {
+  rule: "bg-blue-100 text-blue-800 border-blue-200",
+  example: "bg-purple-100 text-purple-800 border-purple-200",
+  restructure: "bg-orange-100 text-orange-800 border-orange-200",
+};
 
 export default function EvalRunDetail() {
   const runId = window.location.pathname.split("/run/")[1];
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [improving, setImproving] = useState(false);
+  const [approvingId, setApprovingId] = useState(null);
 
   const { data: run, isLoading } = useQuery({
     queryKey: ["run", runId],
@@ -52,47 +58,33 @@ export default function EvalRunDetail() {
   });
 
   const { data: parentRun } = useQuery({
-     queryKey: ["parent-run", variant?.parent_eval_run_id, run?.prompt_id],
-     queryFn: async () => {
-       if (variant?.parent_eval_run_id) {
-         const runs = await base44.entities.EvalRun.filter({ id: variant.parent_eval_run_id });
-         return runs[0] || null;
-       }
-       if (run?.prompt_id) {
-         const allRuns = await base44.entities.EvalRun.filter({ prompt_id: run.prompt_id });
-         const sorted = allRuns.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
-         const currentIndex = sorted.findIndex(r => r.id === runId);
-         return currentIndex > 0 ? sorted[currentIndex + 1] : null;
-       }
-       return null;
-     },
-     enabled: !!run?.prompt_id,
-   });
+    queryKey: ["parent-run", variant?.parent_eval_run_id, run?.prompt_id],
+    queryFn: async () => {
+      if (variant?.parent_eval_run_id) {
+        const runs = await base44.entities.EvalRun.filter({ id: variant.parent_eval_run_id });
+        return runs[0] || null;
+      }
+      if (run?.prompt_id) {
+        const allRuns = await base44.entities.EvalRun.filter({ prompt_id: run.prompt_id });
+        const sorted = allRuns.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+        const currentIndex = sorted.findIndex(r => r.id === runId);
+        return currentIndex > 0 ? sorted[currentIndex + 1] : null;
+      }
+      return null;
+    },
+    enabled: !!run?.prompt_id,
+  });
 
-   const { data: extractedChange } = useQuery({
-     queryKey: ["extracted-change", variant?.id],
-     queryFn: async () => {
-       if (!variant?.original_prompt_text || !variant?.improved_prompt_text) return null;
-       const origRes = await fetch(variant.original_prompt_text);
-       const origText = await origRes.text();
-       const improvRes = await fetch(variant.improved_prompt_text);
-       const improvText = await improvRes.text();
+  const { data: pendingVariants = [], refetch: refetchPending } = useQuery({
+    queryKey: ["pending-variants", runId],
+    queryFn: async () => {
+      const vars = await base44.entities.PromptVariant.filter({ parent_eval_run_id: runId });
+      return vars.filter(v => v.status === "pending_approval");
+    },
+    enabled: !!runId,
+    refetchInterval: improving ? 2000 : false,
+  });
 
-       // Split into sentences (period, exclamation, question mark)
-       const origSentences = origText.split(/(?<=[.!?])\s+/).filter(s => s.trim());
-       const improvSentences = improvText.split(/(?<=[.!?])\s+/).filter(s => s.trim());
-
-       // Find sentences that exist in improved but not in original
-       const addedSentences = improvSentences.filter(sent => 
-         !origSentences.some(orig => orig.toLowerCase().includes(sent.toLowerCase()) || sent.toLowerCase().includes(orig.toLowerCase()))
-       );
-
-       return addedSentences.length > 0 ? addedSentences.join(" ") : "";
-     },
-     enabled: !!variant?.original_prompt_text && !!variant?.improved_prompt_text,
-   });
-
-  // Poll while running
   const isRunning = run?.status === "running" || run?.status === "pending";
   useEffect(() => {
     if (!isRunning) return;
@@ -102,6 +94,35 @@ export default function EvalRunDetail() {
     }, 3000);
     return () => clearInterval(interval);
   }, [isRunning, runId, queryClient]);
+
+  useEffect(() => {
+    if (pendingVariants.length > 0) setImproving(false);
+  }, [pendingVariants.length]);
+
+  async function handleImprovePrompt() {
+    setImproving(true);
+    try {
+      await base44.functions.invoke("improvePrompt", { eval_run_id: runId, annotations: [] });
+      refetchPending();
+    } catch (err) {
+      console.error("improvePrompt failed:", err);
+      setImproving(false);
+      alert("Variant generation failed — please try again.");
+    }
+  }
+
+  async function handleApprove(variantId) {
+    setApprovingId(variantId);
+    await base44.functions.invoke("improvePrompt", { approve_variant_id: variantId });
+    queryClient.invalidateQueries({ queryKey: ["pending-variants", runId] });
+    setApprovingId(null);
+    navigate(`/experiments`);
+  }
+
+  async function handleDiscard(variantId) {
+    await base44.entities.PromptVariant.update(variantId, { status: "rejected" });
+    queryClient.invalidateQueries({ queryKey: ["pending-variants", runId] });
+  }
 
   if (isLoading) {
     return (
@@ -119,6 +140,8 @@ export default function EvalRunDetail() {
     );
   }
 
+  const hasPendingVariants = pendingVariants.length > 0;
+
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-6">
       <button
@@ -129,39 +152,23 @@ export default function EvalRunDetail() {
         Back
       </button>
 
-      {/* Top bar */}
       <div className="flex items-center gap-4 flex-wrap">
         <h1 className="text-xl font-semibold">{prompt?.name || "Eval Run"}</h1>
         <StatusBadge status={run.status} />
         <span className="text-sm text-muted-foreground">
           {new Date(run.created_date).toLocaleString("en-AU", { timeZone: "Australia/Sydney", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })} AEST
         </span>
-        {run.status === "complete" && (
+        {run.status === "complete" && !hasPendingVariants && (
           <div className="ml-auto flex items-center gap-2">
             <Button
               size="sm"
               variant="outline"
               disabled={improving}
-              onClick={async () => {
-                setImproving(true);
-                await base44.functions.invoke("improvePrompt", { eval_run_id: runId, annotations: [] });
-                setImproving(false);
-                navigate(`/variants/${run.prompt_id}`);
-              }}
+              onClick={handleImprovePrompt}
               className="gap-1.5"
             >
               {improving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {improving ? "Generating..." : "Improve Prompt"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled
-              className="gap-1.5 opacity-50 cursor-not-allowed"
-              title="Coming soon"
-            >
-              <GitBranch className="w-3.5 h-3.5" />
-              A/B Tweak
+              {improving ? "Generating variants…" : "Improve Prompt"}
             </Button>
             <button
               onClick={() => navigate(`/experiments`)}
@@ -173,7 +180,6 @@ export default function EvalRunDetail() {
         )}
       </div>
 
-      {/* Score summary */}
       {run.status === "complete" && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <div className="border rounded-lg p-4 bg-card">
@@ -211,69 +217,37 @@ export default function EvalRunDetail() {
         </div>
       )}
 
-      {run.status === "running" || run.status === "pending" ? (
+      {isRunning && (
         <div className="text-sm text-muted-foreground flex items-center gap-2">
           <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-foreground rounded-full animate-spin" />
           Running evaluation...
         </div>
-      ) : null}
+      )}
 
-      {/* Comparison with parent run */}
-      {parentRun && run.status === "complete" && (
-        <div className="border rounded-lg p-4 bg-card space-y-4">
-          <h2 className="text-sm font-semibold">
-            Criterion Comparison
-            <button
-              onClick={() => navigate(`/run/${parentRun.id}`)}
-              className="text-xs font-normal text-primary hover:underline ml-2"
-            >
-              vs {new Date(parentRun.created_date).toLocaleString("en-AU", { timeZone: "Australia/Sydney", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}
-            </button>
-          </h2>
-          <div className="grid grid-cols-2 gap-4 text-xs">
-            {Object.entries(run.criterion_averages || {}).map(([criterion, score]) => {
-              const parentScore = parentRun.criterion_averages?.[criterion] || 0;
-              const delta = score - parentScore;
-              return (
-                <div key={criterion} className="border rounded p-3 space-y-1">
-                  <p className="font-medium text-foreground">{criterion}</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{parentScore.toFixed(1)}</span>
-                    <span className="text-muted-foreground">→</span>
-                    <span className={delta > 0 ? "text-green-600 font-semibold" : delta < 0 ? "text-red-600 font-semibold" : ""}>{score.toFixed(1)}</span>
-                    {delta !== 0 && (
-                      <span className={`text-xs ${delta > 0 ? "text-green-600" : "text-red-600"}`}>
-                        ({delta > 0 ? "+" : ""}{delta.toFixed(1)})
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+      {hasPendingVariants && (
+        <div className="border-2 border-primary/20 rounded-xl bg-primary/5 p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-semibold">3 variants ready — pick one to run full eval</h2>
           </div>
-          {variant && (
-            <div className="border-t pt-3 space-y-3">
-              {variant.diagnosis && (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase">Diagnosis</p>
-                  <p className="text-sm leading-relaxed text-foreground">{variant.diagnosis}</p>
-                </div>
-              )}
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase">Experiment Hypothesis</p>
-                <p className="text-sm leading-relaxed">
-                  If we add <span className="font-semibold text-amber-600">"{extractedChange}"</span>, then <span className="font-semibold text-green-600">{variant.target_criterion}</span> should improve.
-                </p>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Result: {variant.score_delta > 0 ? "✓ Improved" : variant.score_delta < 0 ? "✗ Declined" : "— No change"} ({variant.score_delta > 0 ? "+" : ""}{variant.score_delta?.toFixed(1)})
-              </p>
-            </div>
-          )}
+          <div className="grid gap-4 sm:grid-cols-3">
+            {pendingVariants.map(v => (
+              <VariantApprovalCard
+                key={v.id}
+                variant={v}
+                onApprove={() => handleApprove(v.id)}
+                onDiscard={() => handleDiscard(v.id)}
+                approving={approvingId === v.id}
+              />
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Results table */}
+      {parentRun && run.status === "complete" && (
+        <CriterionComparison run={run} parentRun={parentRun} variant={variant} />
+      )}
+
       <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
@@ -298,6 +272,75 @@ export default function EvalRunDetail() {
             )}
           </TableBody>
         </Table>
+      </div>
+    </div>
+  );
+}
+
+function VariantApprovalCard({ variant, onApprove, onDiscard, approving }) {
+  const [showSample, setShowSample] = useState(false);
+  const strategyKey = variant.strategy || "rule";
+  const strategyLabel = STRATEGY_LABELS[strategyKey] || strategyKey;
+  const strategyColor = STRATEGY_COLORS[strategyKey] || STRATEGY_COLORS.rule;
+
+  return (
+    <div className="border rounded-lg bg-white flex flex-col">
+      <div className="p-4 space-y-3 flex-1">
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${strategyColor}`}>
+            {strategyLabel}
+          </span>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">What changed</p>
+          <p className="text-sm leading-relaxed">{variant.change_summary}</p>
+        </div>
+
+        {variant.why_this_helps && (
+          <div className="space-y-1">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Why it should help</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">{variant.why_this_helps}</p>
+          </div>
+        )}
+
+        {variant.sample_output && (
+          <div className="space-y-1">
+            <button
+              onClick={() => setShowSample(s => !s)}
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              {showSample ? "Hide sample output ↑" : "Show sample output ↓"}
+            </button>
+            {showSample && (
+              <div className="bg-muted rounded p-2 text-xs text-muted-foreground leading-relaxed max-h-40 overflow-y-auto">
+                {variant.sample_output}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="border-t p-3 flex gap-2">
+        <Button
+          size="sm"
+          className="flex-1 gap-1.5"
+          onClick={onApprove}
+          disabled={approving}
+        >
+          {approving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+          {approving ? "Starting…" : "Approve"}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5 text-muted-foreground"
+          onClick={onDiscard}
+          disabled={approving}
+        >
+          <XCircle className="w-3.5 h-3.5" />
+          Discard
+        </Button>
       </div>
     </div>
   );

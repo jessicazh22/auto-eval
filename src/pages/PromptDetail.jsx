@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Play, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Loader2, Paperclip, X } from "lucide-react";
 import debounce from "lodash/debounce";
 import RubricEditor from "@/components/prompt/RubricEditor";
 import EvalRunsTable from "@/components/prompt/EvalRunsTable";
@@ -163,14 +163,31 @@ export default function PromptDetail() {
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Reference Docs</p>
           <ReferenceDocs
-            attachedFiles={attachedFiles}
+            attachedFiles={attachedFiles.filter(f => f.name !== "__gold_standard__")}
             onFilesChange={async (newFiles) => {
-              setAttachedFiles(newFiles);
-              await base44.entities.Prompt.update(prompt.id, { attached_files: newFiles });
+              const gold = attachedFiles.filter(f => f.name === "__gold_standard__");
+              const merged = [...newFiles, ...gold];
+              setAttachedFiles(merged);
+              await base44.entities.Prompt.update(prompt.id, { attached_files: merged });
             }}
             promptId={promptId}
           />
         </div>
+      </section>
+
+      {/* Gold Standard */}
+      <section className="space-y-2">
+        <div>
+          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gold Standard Output</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">An ideal output example. When attached, the eval judge calibrates scores against it — outputs matching it score 8–10, outputs far from it score 1–3.</p>
+        </div>
+        <GoldStandardUpload
+          attachedFiles={attachedFiles}
+          onUpdate={async (newFiles) => {
+            setAttachedFiles(newFiles);
+            await base44.entities.Prompt.update(prompt.id, { attached_files: newFiles });
+          }}
+        />
       </section>
 
       {/* Section 3: Rubric */}
@@ -216,5 +233,64 @@ export default function PromptDetail() {
         />
       )}
     </div>
+  );
+}
+
+const GOLD_STANDARD_MARKER = "__gold_standard__";
+
+function GoldStandardUpload({ attachedFiles, onUpdate }) {
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const goldEntry = attachedFiles.find(f => f.name === GOLD_STANDARD_MARKER);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const without = attachedFiles.filter(f => f.name !== GOLD_STANDARD_MARKER);
+      await onUpdate([...without, { name: GOLD_STANDARD_MARKER, url: file_url }]);
+    } catch (err) {
+      console.error("Gold standard upload failed:", err);
+    }
+    setUploading(false);
+    e.target.value = "";
+  };
+
+  const handleRemove = async () => {
+    await onUpdate(attachedFiles.filter(f => f.name !== GOLD_STANDARD_MARKER));
+  };
+
+  if (goldEntry) {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 border border-green-200 rounded-md text-xs text-green-700">
+          <Paperclip className="w-3 h-3" />
+          <a href={goldEntry.url} target="_blank" rel="noreferrer" className="hover:underline">Gold standard attached</a>
+        </div>
+        <button
+          onClick={handleRemove}
+          className="text-xs text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1"
+        >
+          <X className="w-3 h-3" /> Remove
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+      >
+        {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
+        {uploading ? "Uploading..." : "Attach gold standard (.txt)"}
+      </button>
+      <input ref={fileInputRef} type="file" accept=".txt,.md" className="hidden" onChange={handleUpload} />
+    </>
   );
 }
