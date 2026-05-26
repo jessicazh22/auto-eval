@@ -60,14 +60,32 @@ export default function GenerateRubric() {
     if (!promptId) return;
     const rubrics = await base44.entities.Rubric.filter({ prompt_id: promptId });
     const rubric = rubrics[0];
-    if (rubric?.annotation_text) {
-      setFeedbackText(rubric.annotation_text);
-      // Also restore guided fields if they're embedded in the text
-      const failureMatch = rubric.annotation_text.match(/Most common failure: (.+?)(?:\n\n|$)/s);
-      const successMatch = rubric.annotation_text.match(/What a perfect output looks like: (.+?)(?:\n\n|$)/s);
-      if (failureMatch) setCommonFailure(failureMatch[1].trim());
-      if (successMatch) setSuccessDescription(successMatch[1].trim());
-    }
+    if (!rubric?.annotation_text) return;
+    try {
+      const saved = JSON.parse(rubric.annotation_text);
+      if (saved.__version === 2) {
+        setActiveTab(saved.mode || "examples");
+        if (saved.mode === "general") {
+          setCommonFailure(saved.general?.commonFailure || "");
+          setSuccessDescription(saved.general?.successDescription || "");
+          setFeedbackText(saved.general?.feedbackText || "");
+        } else {
+          const restored = (saved.examples || []).map((e) => ({
+            text: e.fileUrl ? "" : e.text || "",
+            file: e.fileUrl ? { name: e.fileName, url: e.fileUrl } : null,
+            annotation: e.annotation || "",
+          }));
+          setExamples(restored.length > 0 ? restored : [{ text: "", file: null, annotation: "" }]);
+        }
+        return;
+      }
+    } catch (_) {}
+    // Legacy fallback
+    setFeedbackText(rubric.annotation_text);
+    const failureMatch = rubric.annotation_text.match(/Most common failure: (.+?)(?:\n\n|$)/s);
+    const successMatch = rubric.annotation_text.match(/What a perfect output looks like: (.+?)(?:\n\n|$)/s);
+    if (failureMatch) setCommonFailure(failureMatch[1].trim());
+    if (successMatch) setSuccessDescription(successMatch[1].trim());
   };
 
   const handleGenerate = async () => {
@@ -109,19 +127,20 @@ export default function GenerateRubric() {
   const handleSave = async (criteria) => {
     setSaving(true);
 
-    // Build the annotation text to persist
-    const savedAnnotationText = activeTab === "general"
-      ? [
-          commonFailure.trim() ? `Most common failure: ${commonFailure.trim()}` : "",
-          successDescription.trim() ? `What a perfect output looks like: ${successDescription.trim()}` : "",
-          feedbackText.trim(),
-        ].filter(Boolean).join("\n\n")
-      : examples.filter(e => e.text || e.file || e.annotation)
-          .map((e, i) => {
-            const content = e.file ? `[Attached file: ${e.file.name}]` : e.text || "(no content)";
-            return `Example ${i + 1}:\nOutput: ${content}\nFeedback: ${e.annotation || "(no comment)"}`;
-          }).join("\n\n");
-
+    // Persist full state as JSON so it can be restored exactly
+    const savedState = activeTab === "general"
+      ? { __version: 2, mode: "general", general: { commonFailure, successDescription, feedbackText } }
+      : {
+          __version: 2,
+          mode: "examples",
+          examples: examples.filter(e => e.text || e.file || e.annotation).map(e => ({
+            text: e.file ? "" : e.text || "",
+            fileName: e.file?.name || null,
+            fileUrl: e.file?.url || null,
+            annotation: e.annotation || "",
+          })),
+        };
+    const savedAnnotationText = JSON.stringify(savedState);
     const savedFileUrls = activeTab === "examples"
       ? examples.filter(e => e.file?.url).map(e => e.file.url)
       : [];
