@@ -3,8 +3,6 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Plus, Trash2, CheckCircle } from "lucide-react";
-import ScoreBadge from "@/components/shared/ScoreBadge";
-import DeltaBadge from "@/components/shared/DeltaBadge";
 import CollapsibleDiffViewer from "@/components/experiments/CollapsibleDiffViewer";
 import NewExperimentModal from "@/components/experiments/NewExperimentModal";
 import { Button } from "@/components/ui/button";
@@ -23,7 +21,6 @@ export default function Experiments() {
       const stored = sessionStorage.getItem("experiments_generating");
       if (!stored) return null;
       const { promptName, at } = JSON.parse(stored);
-      // Expire after 3 minutes
       if (Date.now() - at > 3 * 60 * 1000) {
         sessionStorage.removeItem("experiments_generating");
         return null;
@@ -64,6 +61,7 @@ export default function Experiments() {
     if (Array.isArray(f)) return variants.filter(v => f.includes(v.status)).length;
     return variants.filter(v => v.status === f).length;
   };
+
   const hasActiveVariants = variants.some(v => v.status === "running" || v.status === "generating");
 
   useEffect(() => {
@@ -129,29 +127,29 @@ export default function Experiments() {
         </div>
       )}
 
-      {!isLoading && variants.length === 0 && (
+      {!isLoading && variants.length === 0 && !showGeneratingPlaceholder && (
         <div className="bg-white border border-[#e7e5e4] rounded-[16px] p-12 text-center text-[#a8a29e] text-[15px]">
           No experiments yet. Click "Improve Prompt" on a completed eval run to start one.
         </div>
       )}
 
       <div className="space-y-4">
-        {filteredVariants.map((v) => {
         {showGeneratingPlaceholder && (
-          <div className="border rounded-lg bg-card overflow-hidden">
-            <div className="px-5 py-4 flex items-center justify-between gap-4">
-              <div className="space-y-2">
+          <div className="bg-white border border-[#e7e5e4] rounded-[16px] overflow-hidden">
+            <div className="px-6 py-5 flex items-center justify-between gap-4">
+              <div className="space-y-1">
                 {generatingPromptName && (
-                  <p className="text-xs text-muted-foreground">{generatingPromptName.length > 40 ? generatingPromptName.slice(0, 40) + "…" : generatingPromptName}</p>
+                  <p className="text-[12px] text-[#a8a29e]">{generatingPromptName.length > 40 ? generatingPromptName.slice(0, 40) + "…" : generatingPromptName}</p>
                 )}
-                <p className="text-sm font-semibold text-muted-foreground">Generating 3 variants…</p>
-                <p className="text-xs text-muted-foreground">Analysing failing outputs and crafting improvements</p>
+                <p className="text-[14px] font-semibold text-[#292524]">Generating variants…</p>
+                <p className="text-[13px] text-[#777169]">Analysing failing outputs and crafting improvements</p>
               </div>
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground shrink-0" />
+              <Loader2 className="w-5 h-5 animate-spin text-[#a8a29e] shrink-0" />
             </div>
           </div>
         )}
-        {variants.map((v) => {
+
+        {filteredVariants.map((v) => {
           const prompt = promptMap[v.prompt_id];
           return (
             <VariantCard
@@ -244,30 +242,10 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
               <p className="text-[13px] text-[#4e4e4e] leading-relaxed">{variant.diagnosis}</p>
             </div>
           )}
-          <p className="text-[14px] text-[#292524] font-medium">{variant.change_summary}</p>
-          <p className="text-[12px] text-[#a8a29e]">
-              <button onClick={onViewPrompt} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
-                {promptName.length > 40 ? promptName.slice(0, 40) + "…" : promptName}
-              </button>
-            )}
-            {variant.strategy && (
-              <span className="text-xs px-2 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200 capitalize">
-                {variant.strategy}
-              </span>
-            )}
-            {variant.target_criterion && (
-              <span className="text-xs text-muted-foreground">
-                → <span className="font-medium text-foreground">{variant.target_criterion}</span>
-              </span>
-            )}
-          </div>
           {variant.change_summary && (
-            <p className="text-sm font-semibold leading-snug">
-              {variant.strategy ? `${variant.strategy.charAt(0).toUpperCase() + variant.strategy.slice(1)} — ` : ""}
-              {variant.change_summary.length > 80 ? variant.change_summary.slice(0, 80) + "…" : variant.change_summary}
-            </p>
+            <p className="text-[14px] text-[#292524] font-medium">{variant.change_summary}</p>
           )}
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[12px] text-[#a8a29e]">
             {new Date(variant.created_date).toLocaleString("en-AU", {
               timeZone: "Australia/Sydney",
               month: "short", day: "numeric",
@@ -303,69 +281,33 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
                   )}
                 </div>
               </div>
-              {variant.variant_eval_run_id && (
-                <button
-                  onClick={onViewRun}
-                  className="text-[13px] font-medium px-4 py-1.5 rounded-full border border-[#e7e5e4] hover:border-[#d6d3d1] text-[#292524] transition-all"
-                >
-                  View results
-                </button>
-              )}
-            </>
-          ) : variant.status === "failed" ? (
-            <span className="text-[13px] text-[#dc2626]">Failed</span>
-              <div className="text-right space-y-2">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Before → After</p>
-                  <div className="flex items-center gap-2">
-                    <ScoreBadge score={variant.original_score} size="sm" />
-                    <span className="text-muted-foreground">→</span>
-                    <ScoreBadge score={variant.variant_score} size="sm" />
-                    <DeltaBadge delta={delta} />
-                  </div>
-                </div>
-                {variant.per_criterion_delta && Object.keys(variant.per_criterion_delta).length > 0 && (
-                  <div className="flex flex-wrap gap-1 justify-end">
-                    {Object.entries(variant.per_criterion_delta).map(([criterion, d]) => {
-                      const isRegression = d < -1.0;
-                      const isImproved = d > 0;
-                      const chipClass = isRegression
-                        ? "bg-red-100 text-red-700 border-red-200"
-                        : isImproved
-                        ? "bg-green-100 text-green-700 border-green-200"
-                        : "bg-amber-50 text-amber-700 border-amber-200";
-                      return (
-                        <span key={criterion} className={`text-xs px-1.5 py-0.5 rounded border ${chipClass}`}>
-                          {criterion} {d > 0 ? "+" : ""}{d.toFixed(1)}
-                          {isRegression && " ⚠"}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
               <div className="flex flex-col gap-1.5">
                 {applied ? (
-                  <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                  <span className="text-[13px] text-[#16a34a] font-medium flex items-center gap-1">
                     <CheckCircle className="w-3.5 h-3.5" /> Applied
                   </span>
                 ) : (
-                  <Button size="sm" onClick={handleApply} disabled={applying} className="text-xs gap-1.5">
+                  <button
+                    onClick={handleApply}
+                    disabled={applying}
+                    className="px-4 py-1.5 bg-[#292524] text-white rounded-full text-[13px] font-medium hover:bg-[#0c0a09] transition-all disabled:opacity-50 flex items-center gap-1.5"
+                  >
                     {applying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                     {applying ? "Applying…" : "Apply to Prompt"}
-                  </Button>
+                  </button>
                 )}
                 {variant.variant_eval_run_id && (
-                  <Button size="sm" variant="outline" onClick={onViewRun} className="text-xs">
+                  <button
+                    onClick={onViewRun}
+                    className="text-[13px] font-medium px-4 py-1.5 rounded-full border border-[#e7e5e4] hover:border-[#d6d3d1] text-[#292524] transition-all"
+                  >
                     View results
-                  </Button>
+                  </button>
                 )}
               </div>
             </>
           ) : variant.status === "failed" ? (
-            <span className="text-xs text-destructive">Failed</span>
-          ) : variant.status === "rejected" ? (
-            <span className="text-xs text-muted-foreground italic">Discarded</span>
+            <span className="text-[13px] text-[#dc2626]">Failed</span>
           ) : null}
           <button
             onClick={() => setShowDeleteConfirm(true)}
