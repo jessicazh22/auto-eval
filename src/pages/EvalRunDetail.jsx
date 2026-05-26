@@ -79,10 +79,9 @@ export default function EvalRunDetail() {
 
   async function handleImprovePrompt() {
     setImproving(true);
-    // Fire and navigate — variants appear in Experiments as they're created
     base44.functions.invoke("improvePrompt", { eval_run_id: runId, annotations: [] })
       .catch(err => console.error("improvePrompt failed:", err));
-    navigate("/experiments");
+    navigate("/experiments", { state: { generating: true, promptName: prompt?.name } });
   }
 
   if (isLoading) {

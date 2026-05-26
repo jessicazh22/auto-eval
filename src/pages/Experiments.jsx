@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Loader2, Plus, Trash2, CheckCircle } from "lucide-react";
 import ScoreBadge from "@/components/shared/ScoreBadge";
 import DeltaBadge from "@/components/shared/DeltaBadge";
@@ -12,8 +12,10 @@ import { useVariantPolling } from "@/hooks/useVariantPolling";
 
 export default function Experiments() {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [showNew, setShowNew] = useState(false);
+  const generatingPromptName = location.state?.generating ? location.state?.promptName : null;
 
   const { data: variants = [], isLoading } = useQuery({
     queryKey: ["all-variants"],
@@ -31,6 +33,9 @@ export default function Experiments() {
 
   const promptMap = Object.fromEntries(prompts.map(p => [p.id, p]));
   useVariantPolling(variants, queryClient, ["all-variants"]);
+
+  const hasActiveVariants = variants.some(v => v.status === "running" || v.status === "generating");
+  const showGeneratingPlaceholder = !!generatingPromptName && !hasActiveVariants;
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-6">
@@ -67,6 +72,20 @@ export default function Experiments() {
       )}
 
       <div className="space-y-4">
+        {showGeneratingPlaceholder && (
+          <div className="border rounded-lg bg-card overflow-hidden">
+            <div className="px-5 py-4 flex items-center justify-between gap-4">
+              <div className="space-y-2">
+                {generatingPromptName && (
+                  <p className="text-xs text-muted-foreground">{generatingPromptName.length > 40 ? generatingPromptName.slice(0, 40) + "…" : generatingPromptName}</p>
+                )}
+                <p className="text-sm font-semibold text-muted-foreground">Generating 3 variants…</p>
+                <p className="text-xs text-muted-foreground">Analysing failing outputs and crafting improvements</p>
+              </div>
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground shrink-0" />
+            </div>
+          </div>
+        )}
         {variants.map((v) => {
           const prompt = promptMap[v.prompt_id];
           return (
