@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Loader2, Plus, Trash2, CheckCircle } from "lucide-react";
 import ScoreBadge from "@/components/shared/ScoreBadge";
 import DeltaBadge from "@/components/shared/DeltaBadge";
@@ -12,10 +12,22 @@ import { useVariantPolling } from "@/hooks/useVariantPolling";
 
 export default function Experiments() {
   const navigate = useNavigate();
-  const location = useLocation();
   const queryClient = useQueryClient();
   const [showNew, setShowNew] = useState(false);
-  const generatingPromptName = location.state?.generating ? location.state?.promptName : null;
+
+  const [generatingPromptName, setGeneratingPromptName] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem("experiments_generating");
+      if (!stored) return null;
+      const { promptName, at } = JSON.parse(stored);
+      // Expire after 3 minutes
+      if (Date.now() - at > 3 * 60 * 1000) {
+        sessionStorage.removeItem("experiments_generating");
+        return null;
+      }
+      return promptName || "prompt";
+    } catch { return null; }
+  });
 
   const { data: variants = [], isLoading } = useQuery({
     queryKey: ["all-variants"],
@@ -35,6 +47,14 @@ export default function Experiments() {
   useVariantPolling(variants, queryClient, ["all-variants"]);
 
   const hasActiveVariants = variants.some(v => v.status === "running" || v.status === "generating");
+
+  useEffect(() => {
+    if (hasActiveVariants && generatingPromptName) {
+      sessionStorage.removeItem("experiments_generating");
+      setGeneratingPromptName(null);
+    }
+  }, [hasActiveVariants, generatingPromptName]);
+
   const showGeneratingPlaceholder = !!generatingPromptName && !hasActiveVariants;
 
   return (

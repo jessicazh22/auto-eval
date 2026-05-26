@@ -81,7 +81,8 @@ export default function EvalRunDetail() {
     setImproving(true);
     base44.functions.invoke("improvePrompt", { eval_run_id: runId, annotations: [] })
       .catch(err => console.error("improvePrompt failed:", err));
-    navigate("/experiments", { state: { generating: true, promptName: prompt?.name } });
+    sessionStorage.setItem("experiments_generating", JSON.stringify({ promptName: prompt?.name, at: Date.now() }));
+    navigate("/experiments");
   }
 
   if (isLoading) {
