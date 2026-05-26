@@ -227,15 +227,20 @@ export default function EvalRunDetail() {
                 </div>
               )}
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase">Experiment Hypothesis</p>
-                <p className="text-sm font-medium leading-relaxed">{variant.change_summary}</p>
-                {variant.target_criterion && (
-                  <p className="text-xs text-muted-foreground">Targeting: {variant.target_criterion}</p>
-                )}
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Hypothesis</p>
+                <p className="text-sm leading-relaxed">
+                  If we <span className="font-medium">"{variant.change_summary}"</span>
+                  {variant.target_criterion && (
+                    <>, then <span className="font-medium text-amber-700">{variant.target_criterion}</span> should improve</>
+                  )}
+                  {variant.why_this_helps && (
+                    <>, because {variant.why_this_helps.split(".")[0].trim()}.</>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground pt-1">
+                  Result: {variant.score_delta > 0 ? "✓ Improved" : variant.score_delta < 0 ? "✗ Declined" : "— No change"} ({variant.score_delta > 0 ? "+" : ""}{variant.score_delta?.toFixed(1)})
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Result: {variant.score_delta > 0 ? "✓ Improved" : variant.score_delta < 0 ? "✗ Declined" : "— No change"} ({variant.score_delta > 0 ? "+" : ""}{variant.score_delta?.toFixed(1)})
-              </p>
             </div>
           )}
         </div>
