@@ -86,30 +86,12 @@ export default function Experiments() {
   );
 }
 
-function usePromptDiff(originalUrl, improvedUrl) {
-  const [diff, setDiff] = useState(null);
-  useEffect(() => {
-    if (!originalUrl || !improvedUrl) return;
-    const resolve = url => url.startsWith("http") ? fetch(url).then(r => r.text()) : Promise.resolve(url);
-    Promise.all([resolve(originalUrl), resolve(improvedUrl)]).then(([orig, impr]) => {
-      const split = t => t.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
-      const origSentences = split(orig);
-      const impSentences = split(impr);
-      const added = impSentences.filter(s => !origSentences.includes(s)).join(" ").trim();
-      const removed = origSentences.filter(s => !impSentences.includes(s)).join(" ").trim();
-      setDiff({ added, removed });
-    }).catch(() => {});
-  }, [originalUrl, improvedUrl]);
-  return diff;
-}
-
 function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, onDeleted }) {
   const delta = variant.score_delta;
   const isRunning = variant.status === "running" || variant.status === "generating";
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
-  const diff = usePromptDiff(variant.original_prompt_text, variant.improved_prompt_text);
 
   async function handleApply() {
     if (!window.confirm("Apply this variant as the new prompt? This will update the live prompt text.")) return;
@@ -152,13 +134,10 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
         <div className="space-y-2 min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             {promptName && (
-              <button onClick={onViewPrompt} className="text-xs font-medium text-primary hover:underline">
-                {promptName}
+              <button onClick={onViewPrompt} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+                {promptName.length > 40 ? promptName.slice(0, 40) + "…" : promptName}
               </button>
             )}
-            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
-              {variant.source === "annotations" ? "From Annotations" : "A/B Tweak"}
-            </span>
             {variant.strategy && (
               <span className="text-xs px-2 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200 capitalize">
                 {variant.strategy}
@@ -166,33 +145,36 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
             )}
             {variant.target_criterion && (
               <span className="text-xs text-muted-foreground">
-                targeting <span className="font-medium text-foreground">{variant.target_criterion}</span>
+                → <span className="font-medium text-foreground">{variant.target_criterion}</span>
               </span>
             )}
           </div>
+          {variant.change_summary && (
+            <p className="text-sm font-semibold leading-snug">
+              {variant.strategy ? `${variant.strategy.charAt(0).toUpperCase() + variant.strategy.slice(1)} — ` : ""}
+              {variant.change_summary.length > 80 ? variant.change_summary.slice(0, 80) + "…" : variant.change_summary}
+            </p>
+          )}
           {variant.diagnosis && (
             <div className="bg-slate-50 rounded p-2 border border-slate-200">
               <p className="text-xs font-semibold text-slate-600 mb-0.5">DIAGNOSIS</p>
               <p className="text-xs text-slate-700 leading-relaxed">{variant.diagnosis}</p>
             </div>
           )}
-          <p className="text-sm leading-relaxed">
-            {diff?.added ? (
-              <>If I add <span className="font-medium">"{diff.added}"</span></>
-            ) : diff?.removed ? (
-              <>If I remove <span className="font-medium">"{diff.removed}"</span></>
-            ) : diff ? (
-              <>If I apply this change</>
-            ) : (
-              <span className="text-muted-foreground italic text-xs">Loading diff…</span>
-            )}
-            {(diff?.added || diff?.removed || diff) && variant.target_criterion && (
-              <>, it should improve <span className="font-medium text-amber-700">"{variant.target_criterion}"</span></>
-            )}
-            {(diff?.added || diff?.removed || diff) && variant.why_this_helps && (
-              <> because {variant.why_this_helps}</>
-            )}
-          </p>
+          {variant.change_summary && (
+            <div className="space-y-0.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hypothesis</p>
+              <p className="text-sm leading-relaxed">
+                If we <span className="font-medium">"{variant.change_summary}"</span>
+                {variant.target_criterion && (
+                  <>, then <span className="font-medium text-amber-700">{variant.target_criterion}</span> should improve</>
+                )}
+                {variant.why_this_helps && (
+                  <>, because {variant.why_this_helps.split(".")[0].trim()}.</>
+                )}
+              </p>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
             {new Date(variant.created_date).toLocaleString("en-AU", {
               timeZone: "Australia/Sydney",
