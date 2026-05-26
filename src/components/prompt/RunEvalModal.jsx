@@ -86,6 +86,16 @@ export default function RunEvalModal({ open, onOpenChange, prompt, criteria, onR
             )}
           </div>
 
+          {/* Gold standard */}
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gold Standard</span>
+            {prompt.gold_standard_url ? (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200 font-medium">✓ Attached — scoring calibrated against ideal output</span>
+            ) : (
+              <span className="text-xs text-muted-foreground italic">None — scores may be inflated without a reference</span>
+            )}
+          </div>
+
           {/* LLM call breakdown */}
           <div className="border rounded-md p-3 space-y-2 bg-muted/40">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
