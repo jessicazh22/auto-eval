@@ -103,7 +103,12 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
   }
 
   const deleteMutation = useMutation({
-    mutationFn: () => base44.entities.PromptVariant.delete(variant.id),
+    mutationFn: async () => {
+      if (variant.variant_eval_run_id) {
+        await base44.entities.EvalRun.delete(variant.variant_eval_run_id);
+      }
+      await base44.entities.PromptVariant.delete(variant.id);
+    },
     onSuccess: () => onDeleted(),
   });
 

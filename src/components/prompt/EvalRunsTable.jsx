@@ -38,6 +38,10 @@ export default function EvalRunsTable({ runs, promptId }) {
   const handleDelete = async (runId) => {
     setDeleting(runId);
     try {
+      const linkedVariants = await base44.entities.PromptVariant.filter({ variant_eval_run_id: runId });
+      if (linkedVariants.length > 0) {
+        await base44.entities.PromptVariant.delete(linkedVariants[0].id);
+      }
       await base44.entities.EvalRun.delete(runId);
       queryClient.invalidateQueries({ queryKey: ["evalRuns", promptId] });
     } catch (error) {
