@@ -100,6 +100,7 @@ export default function GenerateRubric() {
     }
     try {
       const saved = JSON.parse(rubric.annotation_text);
+      if (saved.__version !== 2) throw new Error("old format");
       if (saved.__version === 2) {
         setActiveTab(saved.mode || "examples");
         if (saved.mode === "general") {
@@ -119,13 +120,30 @@ export default function GenerateRubric() {
         }
         return;
       }
-    } catch (_) {}
-    // Legacy fallback
-    setFeedbackText(rubric.annotation_text);
-    const failureMatch = rubric.annotation_text.match(/Most common failure: (.+?)(?:\n\n|$)/s);
-    const successMatch = rubric.annotation_text.match(/What a perfect output looks like: (.+?)(?:\n\n|$)/s);
-    if (failureMatch) setCommonFailure(failureMatch[1].trim());
-    if (successMatch) setSuccessDescription(successMatch[1].trim());
+    } catch (_) {
+      // Old format or parse error — seed with structured data and reload
+      const prompt = prompts.find(p => p.id === promptId);
+      if (prompt) {
+        await base44.functions.invoke("seedAnnotations", { prompt_name: prompt.name }).catch(() => {});
+        const fresh = await base44.entities.Rubric.filter({ prompt_id: promptId });
+        if (fresh[0]?.annotation_text) {
+          try {
+            const seeded = JSON.parse(fresh[0].annotation_text);
+            if (seeded.__version === 2) {
+              setActiveTab(seeded.mode || "examples");
+              const restored = (seeded.examples || []).map((e: any) => ({
+                text: e.fileUrl ? "" : e.text || "",
+                file: e.fileUrl ? { name: e.fileName, url: e.fileUrl } : null,
+                annotation: e.annotation || "",
+              }));
+              setExamples(restored.length > 0 ? restored : [{ text: "", file: null, annotation: "" }]);
+              setCommonFailure(seeded.general?.commonFailure || "");
+              setSuccessDescription(seeded.general?.successDescription || "");
+            }
+          } catch (_2) {}
+        }
+      }
+    }
   };
 
   const handleGenerate = async () => {
