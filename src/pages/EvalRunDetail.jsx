@@ -7,22 +7,13 @@ import ScoreBadge from "@/components/shared/ScoreBadge";
 import StatusBadge from "@/components/shared/StatusBadge";
 import ResultRow from "@/components/run/ResultRow";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, TrendingDown, Sparkles, Loader2, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
-import { format } from "date-fns";
-
-const STRATEGY_LABELS = { rule: "Rule", example: "Example", restructure: "Restructure" };
-const STRATEGY_COLORS = {
-  rule: "bg-blue-100 text-blue-800 border-blue-200",
-  example: "bg-purple-100 text-purple-800 border-purple-200",
-  restructure: "bg-orange-100 text-orange-800 border-orange-200",
-};
+import { ArrowLeft, TrendingDown, Sparkles, Loader2 } from "lucide-react";
 
 export default function EvalRunDetail() {
   const runId = window.location.pathname.split("/run/")[1];
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [improving, setImproving] = useState(false);
-  const [approvingId, setApprovingId] = useState(null);
 
   const { data: run, isLoading } = useQuery({
     queryKey: ["run", runId],
@@ -76,18 +67,6 @@ export default function EvalRunDetail() {
     enabled: !!run?.prompt_id,
   });
 
-  // Pending approval variants for this run (shown inline after clicking Improve Prompt)
-  const { data: pendingVariants = [], refetch: refetchPending } = useQuery({
-    queryKey: ["pending-variants", runId],
-    queryFn: async () => {
-      const vars = await base44.entities.PromptVariant.filter({ parent_eval_run_id: runId });
-      return vars.filter(v => v.status === "pending_approval");
-    },
-    enabled: !!runId,
-    refetchInterval: improving ? 2000 : false,
-  });
-
-  // Poll while run is in progress
   const isRunning = run?.status === "running" || run?.status === "pending";
   useEffect(() => {
     if (!isRunning) return;
@@ -98,36 +77,12 @@ export default function EvalRunDetail() {
     return () => clearInterval(interval);
   }, [isRunning, runId, queryClient]);
 
-  // Stop polling for pending variants once they arrive
-  useEffect(() => {
-    if (pendingVariants.length > 0) setImproving(false);
-  }, [pendingVariants.length]);
-
   async function handleImprovePrompt() {
     setImproving(true);
-    try {
-      await base44.functions.invoke("improvePrompt", { eval_run_id: runId, annotations: [] });
-      // Kick off first check — refetchInterval keeps polling every 2s while improving=true
-      refetchPending();
-      // Success: improving stays true until useEffect above detects pendingVariants arriving
-    } catch (err) {
-      console.error("improvePrompt failed:", err);
-      setImproving(false);
-      alert("Variant generation failed — please try again.");
-    }
-  }
-
-  async function handleApprove(variantId) {
-    setApprovingId(variantId);
-    await base44.functions.invoke("improvePrompt", { approve_variant_id: variantId });
-    queryClient.invalidateQueries({ queryKey: ["pending-variants", runId] });
-    setApprovingId(null);
-    navigate(`/experiments`);
-  }
-
-  async function handleDiscard(variantId) {
-    await base44.entities.PromptVariant.update(variantId, { status: "rejected" });
-    queryClient.invalidateQueries({ queryKey: ["pending-variants", runId] });
+    // Fire and navigate — variants appear in Experiments as they're created
+    base44.functions.invoke("improvePrompt", { eval_run_id: runId, annotations: [] })
+      .catch(err => console.error("improvePrompt failed:", err));
+    navigate("/experiments");
   }
 
   if (isLoading) {
@@ -146,8 +101,6 @@ export default function EvalRunDetail() {
     );
   }
 
-  const hasPendingVariants = pendingVariants.length > 0;
-
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-6">
       <button
@@ -165,7 +118,7 @@ export default function EvalRunDetail() {
         <span className="text-sm text-muted-foreground">
           {new Date(run.created_date).toLocaleString("en-AU", { timeZone: "Australia/Sydney", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })} AEST
         </span>
-        {run.status === "complete" && !hasPendingVariants && (
+        {run.status === "complete" && (
           <div className="ml-auto flex items-center gap-2">
             <Button
               size="sm"
@@ -175,7 +128,7 @@ export default function EvalRunDetail() {
               className="gap-1.5"
             >
               {improving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {improving ? "Generating variants…" : "Improve Prompt"}
+              {improving ? "Generating…" : "Improve Prompt"}
             </Button>
             <button
               onClick={() => navigate(`/experiments`)}
@@ -232,27 +185,6 @@ export default function EvalRunDetail() {
         </div>
       )}
 
-      {/* Pending approval panel */}
-      {hasPendingVariants && (
-        <div className="border-2 border-primary/20 rounded-xl bg-primary/5 p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <h2 className="text-sm font-semibold">3 variants ready — pick one to run full eval</h2>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {pendingVariants.map(v => (
-              <VariantApprovalCard
-                key={v.id}
-                variant={v}
-                onApprove={() => handleApprove(v.id)}
-                onDiscard={() => handleDiscard(v.id)}
-                approving={approvingId === v.id}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Comparison with parent run */}
       {parentRun && run.status === "complete" && (
         <div className="border rounded-lg p-4 bg-card space-y-4">
@@ -287,11 +219,11 @@ export default function EvalRunDetail() {
             })}
           </div>
           {variant && (
-            <div className="border-t pt-3 space-y-3">
+            <div className="border-t pt-3 space-y-2">
               {variant.diagnosis && (
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-muted-foreground uppercase">Diagnosis</p>
-                  <p className="text-sm leading-relaxed text-foreground">{variant.diagnosis}</p>
+                  <p className="text-sm leading-relaxed">{variant.diagnosis}</p>
                 </div>
               )}
               <div className="space-y-1">
@@ -334,75 +266,6 @@ export default function EvalRunDetail() {
             )}
           </TableBody>
         </Table>
-      </div>
-    </div>
-  );
-}
-
-function VariantApprovalCard({ variant, onApprove, onDiscard, approving }) {
-  const [showSample, setShowSample] = useState(false);
-  const strategyKey = variant.strategy || "rule";
-  const strategyLabel = STRATEGY_LABELS[strategyKey] || strategyKey;
-  const strategyColor = STRATEGY_COLORS[strategyKey] || STRATEGY_COLORS.rule;
-
-  return (
-    <div className="border rounded-lg bg-white flex flex-col">
-      <div className="p-4 space-y-3 flex-1">
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${strategyColor}`}>
-            {strategyLabel}
-          </span>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">What changed</p>
-          <p className="text-sm leading-relaxed">{variant.change_summary}</p>
-        </div>
-
-        {variant.why_this_helps && (
-          <div className="space-y-1">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Why it should help</p>
-            <p className="text-xs text-muted-foreground leading-relaxed">{variant.why_this_helps}</p>
-          </div>
-        )}
-
-        {variant.sample_output && (
-          <div className="space-y-1">
-            <button
-              onClick={() => setShowSample(s => !s)}
-              className="text-xs font-semibold text-primary hover:underline"
-            >
-              {showSample ? "Hide sample output ↑" : "Show sample output ↓"}
-            </button>
-            {showSample && (
-              <div className="bg-muted rounded p-2 text-xs text-muted-foreground leading-relaxed max-h-40 overflow-y-auto">
-                {variant.sample_output}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="border-t p-3 flex gap-2">
-        <Button
-          size="sm"
-          className="flex-1 gap-1.5"
-          onClick={onApprove}
-          disabled={approving}
-        >
-          {approving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-          {approving ? "Starting…" : "Approve"}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-1.5 text-muted-foreground"
-          onClick={onDiscard}
-          disabled={approving}
-        >
-          <XCircle className="w-3.5 h-3.5" />
-          Discard
-        </Button>
       </div>
     </div>
   );

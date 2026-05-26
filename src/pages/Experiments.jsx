@@ -2,7 +2,7 @@ import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2, CheckCircle } from "lucide-react";
 import ScoreBadge from "@/components/shared/ScoreBadge";
 import DeltaBadge from "@/components/shared/DeltaBadge";
 import CollapsibleDiffViewer from "@/components/experiments/CollapsibleDiffViewer";
@@ -89,6 +89,17 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
   const delta = variant.score_delta;
   const isRunning = variant.status === "running" || variant.status === "generating";
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [applied, setApplied] = useState(false);
+
+  async function handleApply() {
+    if (!window.confirm("Apply this variant as the new prompt? This will update the live prompt text.")) return;
+    setApplying(true);
+    await base44.entities.Prompt.update(variant.prompt_id, { prompt_text: variant.improved_prompt_text });
+    setApplied(true);
+    setApplying(false);
+    onApplied();
+  }
 
   const deleteMutation = useMutation({
     mutationFn: () => base44.entities.PromptVariant.delete(variant.id),
@@ -147,6 +158,9 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
             </div>
           )}
           <p className="text-sm font-medium">{variant.change_summary}</p>
+          {variant.why_this_helps && (
+            <p className="text-xs text-muted-foreground leading-relaxed">{variant.why_this_helps}</p>
+          )}
           <p className="text-xs text-muted-foreground">
             {new Date(variant.created_date).toLocaleString("en-AU", {
               timeZone: "Australia/Sydney",
@@ -194,11 +208,23 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
                   </div>
                 )}
               </div>
-              {variant.variant_eval_run_id && (
-                <Button size="sm" variant="outline" onClick={onViewRun} className="text-xs">
-                  View results
-                </Button>
-              )}
+              <div className="flex flex-col gap-1.5">
+                {applied ? (
+                  <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                    <CheckCircle className="w-3.5 h-3.5" /> Applied
+                  </span>
+                ) : (
+                  <Button size="sm" onClick={handleApply} disabled={applying} className="text-xs gap-1.5">
+                    {applying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                    {applying ? "Applying…" : "Apply to Prompt"}
+                  </Button>
+                )}
+                {variant.variant_eval_run_id && (
+                  <Button size="sm" variant="outline" onClick={onViewRun} className="text-xs">
+                    View results
+                  </Button>
+                )}
+              </div>
             </>
           ) : variant.status === "failed" ? (
             <span className="text-xs text-destructive">Failed</span>
