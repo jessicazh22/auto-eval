@@ -131,7 +131,7 @@ export default function GenerateRubric() {
             const seeded = JSON.parse(fresh[0].annotation_text);
             if (seeded.__version === 2) {
               setActiveTab(seeded.mode || "examples");
-              const restored = (seeded.examples || []).map((e: any) => ({
+              const restored = (seeded.examples || []).map((e) => ({
                 text: e.fileUrl ? "" : e.text || "",
                 file: e.fileUrl ? { name: e.fileName, url: e.fileUrl } : null,
                 annotation: e.annotation || "",
