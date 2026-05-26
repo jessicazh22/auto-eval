@@ -17,7 +17,10 @@ export default function Experiments() {
 
   const { data: variants = [], isLoading } = useQuery({
     queryKey: ["all-variants"],
-    queryFn: () => base44.entities.PromptVariant.list("-created_date"),
+    queryFn: async () => {
+      const all = await base44.entities.PromptVariant.list("-created_date");
+      return all.filter(v => v.status !== "pending_approval" && v.status !== "rejected");
+    },
   });
 
   const { data: prompts = [] } = useQuery({

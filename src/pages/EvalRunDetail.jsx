@@ -105,8 +105,16 @@ export default function EvalRunDetail() {
 
   async function handleImprovePrompt() {
     setImproving(true);
-    await base44.functions.invoke("improvePrompt", { eval_run_id: runId, annotations: [] });
-    refetchPending();
+    try {
+      await base44.functions.invoke("improvePrompt", { eval_run_id: runId, annotations: [] });
+      // Kick off first check — refetchInterval keeps polling every 2s while improving=true
+      refetchPending();
+      // Success: improving stays true until useEffect above detects pendingVariants arriving
+    } catch (err) {
+      console.error("improvePrompt failed:", err);
+      setImproving(false);
+      alert("Variant generation failed — please try again.");
+    }
   }
 
   async function handleApprove(variantId) {
