@@ -67,7 +67,14 @@ export default function Home() {
   };
 
   return (
-    <div className="px-12 py-16 max-w-[1200px] mx-auto">
+    <div className="px-12 py-16 max-w-[1200px] mx-auto relative overflow-hidden">
+
+      {/* Pastel orbs */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
+        <div className="absolute -top-32 -left-32 w-[480px] h-[480px] rounded-full bg-[#a7e5d3] opacity-30 blur-[120px]" />
+        <div className="absolute top-1/4 -right-32 w-[420px] h-[420px] rounded-full bg-[#c8b8e0] opacity-25 blur-[120px]" />
+        <div className="absolute bottom-0 left-1/3 w-[400px] h-[400px] rounded-full bg-[#f4c5a8] opacity-25 blur-[120px]" />
+      </div>
 
       {/* Header */}
       <header className="flex justify-between items-end mb-14">
