@@ -61,13 +61,11 @@ Deno.serve(async (req) => {
     const criteria = await base44.asServiceRole.entities.RubricCriterion.filter({ rubric_id: rubric.id });
     if (criteria.length === 0) throw new Error('No criteria defined');
 
-    // Load gold standard from TestInput reference docs if available
+    // Load gold standard if attached to the prompt
     let goldStandardText = '';
     try {
-      const testInputs = await base44.asServiceRole.entities.TestInput.filter({ prompt_id: prompt.id });
-      const testInput = testInputs[0];
-      if (testInput?.reference_docs?.length > 0) {
-        const goldRes = await fetch(testInput.reference_docs[0].url);
+      if (prompt.gold_standard_url) {
+        const goldRes = await fetch(prompt.gold_standard_url);
         goldStandardText = await goldRes.text();
       }
     } catch (_) {

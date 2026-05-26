@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Play, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Loader2, Paperclip, X } from "lucide-react";
 import debounce from "lodash/debounce";
 import RubricEditor from "@/components/prompt/RubricEditor";
 import EvalRunsTable from "@/components/prompt/EvalRunsTable";
@@ -173,6 +173,15 @@ export default function PromptDetail() {
         </div>
       </section>
 
+      {/* Gold Standard */}
+      <section className="space-y-2">
+        <div>
+          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gold Standard Output</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">An ideal output example. When attached, the eval judge calibrates scores against it — outputs matching it score 8–10, outputs far from it score 1–3.</p>
+        </div>
+        <GoldStandardUpload prompt={prompt} onSaved={() => queryClient.invalidateQueries({ queryKey: ["prompt", promptId] })} />
+      </section>
+
       {/* Section 3: Rubric */}
       <section className="space-y-3">
         <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Rubric</h2>
@@ -216,5 +225,64 @@ export default function PromptDetail() {
         />
       )}
     </div>
+  );
+}
+
+function GoldStandardUpload({ prompt, onSaved }) {
+  const [uploading, setUploading] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    await base44.entities.Prompt.update(prompt.id, { gold_standard_url: file_url });
+    onSaved();
+    setUploading(false);
+    e.target.value = "";
+  };
+
+  const handleRemove = async () => {
+    setRemoving(true);
+    await base44.entities.Prompt.update(prompt.id, { gold_standard_url: null });
+    onSaved();
+    setRemoving(false);
+  };
+
+  if (prompt?.gold_standard_url) {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 border border-green-200 rounded-md text-xs text-green-700">
+          <Paperclip className="w-3 h-3" />
+          <a href={prompt.gold_standard_url} target="_blank" rel="noreferrer" className="hover:underline">
+            Gold standard attached
+          </a>
+        </div>
+        <button
+          onClick={handleRemove}
+          disabled={removing}
+          className="text-xs text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1"
+        >
+          {removing ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+          Remove
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+      >
+        {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
+        {uploading ? "Uploading..." : "Attach gold standard (.txt)"}
+      </button>
+      <input ref={fileInputRef} type="file" accept=".txt,.md" className="hidden" onChange={handleUpload} />
+    </>
   );
 }
