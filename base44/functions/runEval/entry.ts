@@ -9,6 +9,19 @@ const SKIP_PATTERNS = [
   /no content.*today/i,
   /unable to find.*content/i,
   /no.*brief.*today/i,
+  /unable to browse/i,
+  /cannot browse/i,
+  /don't have.*ability to browse/i,
+  /do not have.*ability to browse/i,
+  /unable to access.*web/i,
+  /cannot access.*internet/i,
+  /cannot access.*web/i,
+  /I cannot provide.*brief/i,
+  /I'm unable to provide/i,
+  /I am unable to provide/i,
+  /real.?time.*updates/i,
+  /live updates/i,
+  /check reliable news sources/i,
 ];
 
 function isSkipOutput(output: string): boolean {
@@ -132,10 +145,11 @@ Deno.serve(async (req) => {
       let skipDetected = false;
       if (isSkipOutput(rawOutput)) {
         skipDetected = true;
-        // Retry once with an explicit override
+        // Retry with an explicit instruction to use the provided document only
+        const retrySystemAddendum = `\n\nCRITICAL: You have been given the source content directly in this message. You do NOT need to browse the internet or access any external URLs. Generate the output using ONLY the content provided below. Do not refuse, skip, or say you cannot access the web.`;
         const retryPrompt = docContent
-          ? `<system>\n${promptText}\n\nIMPORTANT: You must generate the brief using the provided content. Do not skip, refuse, or say there is nothing to report.\n</system>\n\n<user>\n${docContent}\n</user>`
-          : promptText + '\n\nIMPORTANT: You must generate output. Do not skip or refuse.';
+          ? `<system>\n${promptText}${retrySystemAddendum}\n</system>\n\n<user>\n${docContent}\n</user>`
+          : `${promptText}${retrySystemAddendum}`;
         rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
           prompt: retryPrompt,
         });
