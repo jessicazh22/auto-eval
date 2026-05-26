@@ -21,11 +21,7 @@ export default function Experiments() {
       const all = await base44.entities.PromptVariant.list("-created_date");
       return all.filter(v => v.status !== "pending_approval" && v.status !== "rejected");
     },
-    refetchInterval: (data) => {
-      // Keep polling if any variants are running, or if backend might still be creating them
-      const anyActive = data?.some(v => v.status === "running" || v.status === "generating");
-      return anyActive ? 4000 : 8000;
-    },
+    refetchInterval: 5000,
   });
 
   const { data: prompts = [] } = useQuery({
