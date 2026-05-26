@@ -158,10 +158,16 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
               <p className="text-xs text-slate-700 leading-relaxed">{variant.diagnosis}</p>
             </div>
           )}
-          <p className="text-sm font-medium">{variant.change_summary}</p>
-          {variant.why_this_helps && (
-            <p className="text-xs text-muted-foreground leading-relaxed">{variant.why_this_helps}</p>
-          )}
+          <p className="text-sm leading-relaxed">
+            If I{" "}
+            <span className="font-medium">"{variant.change_summary}"</span>
+            {variant.target_criterion && (
+              <>, it should improve <span className="font-medium text-amber-700">"{variant.target_criterion}"</span></>
+            )}
+            {variant.why_this_helps && (
+              <> because {variant.why_this_helps}</>
+            )}
+          </p>
           <p className="text-xs text-muted-foreground">
             {new Date(variant.created_date).toLocaleString("en-AU", {
               timeZone: "Australia/Sydney",
