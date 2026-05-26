@@ -10,10 +10,13 @@ import NewExperimentModal from "@/components/experiments/NewExperimentModal";
 import { Button } from "@/components/ui/button";
 import { useVariantPolling } from "@/hooks/useVariantPolling";
 
+const STATUS_FILTERS = ["All", "Complete", "Running", "Failed"];
+
 export default function Experiments() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showNew, setShowNew] = useState(false);
+  const [activeFilter, setActiveFilter] = useState("All");
 
   const { data: variants = [], isLoading } = useQuery({
     queryKey: ["all-variants"],
@@ -28,18 +31,42 @@ export default function Experiments() {
   const promptMap = Object.fromEntries(prompts.map(p => [p.id, p]));
   useVariantPolling(variants, queryClient, ["all-variants"]);
 
+  const filterMap = { All: null, Complete: "complete", Running: ["running", "generating"], Failed: "failed" };
+
+  const filteredVariants = variants.filter(v => {
+    const f = filterMap[activeFilter];
+    if (!f) return true;
+    if (Array.isArray(f)) return f.includes(v.status);
+    return v.status === f;
+  });
+
+  const countFor = (label) => {
+    const f = filterMap[label];
+    if (!f) return variants.length;
+    if (Array.isArray(f)) return variants.filter(v => f.includes(v.status)).length;
+    return variants.filter(v => v.status === f).length;
+  };
+
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-start justify-between">
+    <div className="px-12 py-14 max-w-[900px] mx-auto">
+      <header className="flex items-end justify-between mb-12">
         <div>
-          <h1 className="text-xl font-semibold">Experiments</h1>
-          <p className="text-sm text-muted-foreground mt-1">All prompt improvement attempts across every prompt.</p>
+          <p className="text-[12px] uppercase font-bold text-[#a8a29e] tracking-[0.1em] mb-2">Prompt Improvement</p>
+          <h1
+            className="text-[40px] text-[#0c0a09] leading-[1.1] tracking-tight"
+            style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+          >
+            Experiments
+          </h1>
         </div>
-        <Button size="sm" className="gap-1.5" onClick={() => setShowNew(true)}>
-          <Plus className="w-3.5 h-3.5" />
+        <button
+          onClick={() => setShowNew(true)}
+          className="px-6 py-2.5 bg-[#292524] text-white rounded-full text-[15px] font-medium hover:bg-[#0c0a09] transition-all flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
           New Experiment
-        </Button>
-      </div>
+        </button>
+      </header>
 
       <NewExperimentModal
         open={showNew}
@@ -50,20 +77,38 @@ export default function Experiments() {
         }}
       />
 
+      {/* Filter tabs */}
+      <div className="flex gap-1 mb-8">
+        {STATUS_FILTERS.map(label => (
+          <button
+            key={label}
+            onClick={() => setActiveFilter(label)}
+            className={`px-4 py-1.5 text-[13px] font-medium rounded-full transition-all ${
+              activeFilter === label
+                ? "bg-[#f0efed] text-[#0c0a09]"
+                : "text-[#777169] hover:text-[#0c0a09]"
+            }`}
+          >
+            {label}{" "}
+            <span className="text-[#a8a29e] ml-0.5">{countFor(label)}</span>
+          </button>
+        ))}
+      </div>
+
       {isLoading && (
         <div className="flex justify-center py-16">
-          <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-foreground rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-[#e7e5e4] border-t-[#292524] rounded-full animate-spin" />
         </div>
       )}
 
       {!isLoading && variants.length === 0 && (
-        <div className="border rounded-lg p-12 text-center text-muted-foreground text-sm">
+        <div className="bg-white border border-[#e7e5e4] rounded-[16px] p-12 text-center text-[#a8a29e] text-[15px]">
           No experiments yet. Click "Improve Prompt" on a completed eval run to start one.
         </div>
       )}
 
       <div className="space-y-4">
-        {variants.map((v) => {
+        {filteredVariants.map((v) => {
           const prompt = promptMap[v.prompt_id];
           return (
             <VariantCard
@@ -94,52 +139,54 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
 
   if (showDeleteConfirm) {
     return (
-      <div className="border border-destructive rounded-lg bg-destructive/5 p-4">
-        <p className="text-sm font-medium mb-3">Delete this experiment?</p>
+      <div className="bg-white border border-[#dc2626]/30 rounded-[16px] bg-[#dc2626]/5 p-5">
+        <p className="text-[14px] font-medium text-[#0c0a09] mb-4">Delete this experiment?</p>
         <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="destructive"
+          <button
             onClick={() => deleteMutation.mutate()}
             disabled={deleteMutation.isPending}
+            className="px-4 py-1.5 bg-[#dc2626] text-white rounded-full text-[13px] font-medium hover:bg-[#b91c1c] transition-all disabled:opacity-50"
           >
             {deleteMutation.isPending ? "Deleting…" : "Delete"}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+          </button>
+          <button
+            onClick={() => setShowDeleteConfirm(false)}
+            className="px-4 py-1.5 border border-[#e7e5e4] text-[#292524] rounded-full text-[13px] font-medium hover:border-[#d6d3d1] transition-all"
+          >
             Cancel
-          </Button>
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="border rounded-lg bg-card overflow-hidden">
-      <div className="px-5 py-4 flex items-start justify-between gap-4 border-b border-border">
-        <div className="space-y-2 min-w-0 flex-1">
+    <div className="bg-white border border-[#e7e5e4] rounded-[16px] overflow-hidden hover:border-[#d6d3d1] transition-all">
+      <div className="px-6 py-5 flex items-start justify-between gap-6 border-b border-[#f0efed]">
+        <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             {promptName && (
-              <button onClick={onViewPrompt} className="text-xs font-medium text-primary hover:underline">
+              <button onClick={onViewPrompt} className="text-[14px] font-semibold text-[#0c0a09] hover:underline">
                 {promptName}
               </button>
             )}
-            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
+            <span className="text-[12px] font-medium px-2.5 py-0.5 rounded-full bg-[#f0efed] text-[#777169]">
               {variant.source === "annotations" ? "From Annotations" : "A/B Tweak"}
             </span>
             {variant.target_criterion && (
-              <span className="text-xs text-muted-foreground">
-                targeting <span className="font-medium text-foreground">{variant.target_criterion}</span>
+              <span className="text-[12px] text-[#777169]">
+                targeting <span className="font-medium text-[#292524]">{variant.target_criterion}</span>
               </span>
             )}
           </div>
           {variant.diagnosis && (
-            <div className="bg-slate-50 rounded p-2 border border-slate-200">
-              <p className="text-xs font-semibold text-slate-600 mb-0.5">DIAGNOSIS</p>
-              <p className="text-xs text-slate-700 leading-relaxed">{variant.diagnosis}</p>
+            <div className="bg-[#fafafa] rounded-xl px-3.5 py-2.5 border border-[#f0efed]">
+              <p className="text-[11px] font-semibold text-[#a8a29e] uppercase tracking-[0.08em] mb-1">Diagnosis</p>
+              <p className="text-[13px] text-[#4e4e4e] leading-relaxed">{variant.diagnosis}</p>
             </div>
           )}
-          <p className="text-sm font-medium">{variant.change_summary}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[14px] text-[#292524] font-medium">{variant.change_summary}</p>
+          <p className="text-[12px] text-[#a8a29e]">
             {new Date(variant.created_date).toLocaleString("en-AU", {
               timeZone: "Australia/Sydney",
               month: "short", day: "numeric",
@@ -148,40 +195,51 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0 mt-1">
+        <div className="flex flex-col items-end gap-3 shrink-0 mt-1">
           {isRunning ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 text-[13px] text-[#777169]">
               <Loader2 className="w-4 h-4 animate-spin" />
               Scoring…
             </div>
           ) : variant.status === "complete" ? (
             <>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground mb-1">Before → After</p>
+                <p className="text-[11px] text-[#a8a29e] mb-2">Before → After</p>
                 <div className="flex items-center gap-2">
-                    <ScoreBadge score={variant.original_score} size="sm" />
-                    <span className="text-muted-foreground">→</span>
-                    <ScoreBadge score={variant.variant_score} size="sm" />
-                    <DeltaBadge delta={delta} />
-                  </div>
+                  <span className="text-[14px] font-semibold text-[#292524] bg-[#f0efed] px-2.5 py-1 rounded-lg">
+                    {variant.original_score ?? "—"}
+                  </span>
+                  <span className="text-[#a8a29e] text-sm">→</span>
+                  <span className="text-[14px] font-semibold text-[#292524] bg-[#f0efed] px-2.5 py-1 rounded-lg">
+                    {variant.variant_score ?? "—"}
+                  </span>
+                  {delta != null && (
+                    <span className={`text-[13px] font-semibold px-2 py-0.5 rounded-full ${
+                      delta > 0 ? "text-[#16a34a] bg-[#16a34a]/10" : delta < 0 ? "text-[#dc2626] bg-[#dc2626]/10" : "text-[#777169] bg-[#f0efed]"
+                    }`}>
+                      {delta > 0 ? "+" : ""}{delta}
+                    </span>
+                  )}
+                </div>
               </div>
               {variant.variant_eval_run_id && (
-                <Button size="sm" variant="outline" onClick={onViewRun} className="text-xs">
+                <button
+                  onClick={onViewRun}
+                  className="text-[13px] font-medium px-4 py-1.5 rounded-full border border-[#e7e5e4] hover:border-[#d6d3d1] text-[#292524] transition-all"
+                >
                   View results
-                </Button>
+                </button>
               )}
             </>
           ) : variant.status === "failed" ? (
-            <span className="text-xs text-destructive">Failed</span>
+            <span className="text-[13px] text-[#dc2626]">Failed</span>
           ) : null}
-          <Button
-            size="icon"
-            variant="ghost"
+          <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="text-muted-foreground hover:text-destructive"
+            className="text-[#d6d3d1] hover:text-[#dc2626] transition-all p-1"
           >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
