@@ -14,7 +14,10 @@ import { Play, Paperclip, AlertCircle, FileText, Scale } from "lucide-react";
 export default function RunEvalModal({ open, onOpenChange, prompt, criteria, onRunCreated }) {
   const [submitting, setSubmitting] = useState(false);
 
-  const attachedFiles = prompt.attached_files || [];
+  const GOLD_MARKER = "__gold_standard__";
+  const allFiles = prompt.attached_files || [];
+  const attachedFiles = allFiles.filter(f => f.name !== GOLD_MARKER);
+  const hasGoldStandard = allFiles.some(f => f.name === GOLD_MARKER);
   const RUNS_PER_DOC = 3;
   const docsCount = attachedFiles.length || 1;
   // Per doc per run: 1 generation + 1 scoring call
@@ -89,7 +92,7 @@ export default function RunEvalModal({ open, onOpenChange, prompt, criteria, onR
           {/* Gold standard */}
           <div className="flex items-center gap-2 text-sm">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gold Standard</span>
-            {prompt.gold_standard_url ? (
+            {hasGoldStandard ? (
               <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200 font-medium">✓ Attached — scoring calibrated against ideal output</span>
             ) : (
               <span className="text-xs text-muted-foreground italic">None — scores may be inflated without a reference</span>

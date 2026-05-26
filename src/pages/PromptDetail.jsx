@@ -163,10 +163,12 @@ export default function PromptDetail() {
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Reference Docs</p>
           <ReferenceDocs
-            attachedFiles={attachedFiles}
+            attachedFiles={attachedFiles.filter(f => f.name !== "__gold_standard__")}
             onFilesChange={async (newFiles) => {
-              setAttachedFiles(newFiles);
-              await base44.entities.Prompt.update(prompt.id, { attached_files: newFiles });
+              const gold = attachedFiles.filter(f => f.name === "__gold_standard__");
+              const merged = [...newFiles, ...gold];
+              setAttachedFiles(merged);
+              await base44.entities.Prompt.update(prompt.id, { attached_files: merged });
             }}
             promptId={promptId}
           />
@@ -179,7 +181,13 @@ export default function PromptDetail() {
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gold Standard Output</h2>
           <p className="text-xs text-muted-foreground mt-0.5">An ideal output example. When attached, the eval judge calibrates scores against it — outputs matching it score 8–10, outputs far from it score 1–3.</p>
         </div>
-        <GoldStandardUpload prompt={prompt} onSaved={() => queryClient.invalidateQueries({ queryKey: ["prompt", promptId] })} />
+        <GoldStandardUpload
+          attachedFiles={attachedFiles}
+          onUpdate={async (newFiles) => {
+            setAttachedFiles(newFiles);
+            await base44.entities.Prompt.update(prompt.id, { attached_files: newFiles });
+          }}
+        />
       </section>
 
       {/* Section 3: Rubric */}
@@ -228,13 +236,13 @@ export default function PromptDetail() {
   );
 }
 
-function GoldStandardUpload({ prompt, onSaved }) {
+const GOLD_STANDARD_MARKER = "__gold_standard__";
+
+function GoldStandardUpload({ attachedFiles, onUpdate }) {
   const [uploading, setUploading] = useState(false);
-  const [removing, setRemoving] = useState(false);
-  const [localUrl, setLocalUrl] = useState(null);
   const fileInputRef = useRef(null);
 
-  const activeUrl = localUrl ?? prompt?.gold_standard_url;
+  const goldEntry = attachedFiles.find(f => f.name === GOLD_STANDARD_MARKER);
 
   const handleUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -242,9 +250,8 @@ function GoldStandardUpload({ prompt, onSaved }) {
     setUploading(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      await base44.entities.Prompt.update(prompt.id, { gold_standard_url: file_url });
-      setLocalUrl(file_url);
-      onSaved();
+      const without = attachedFiles.filter(f => f.name !== GOLD_STANDARD_MARKER);
+      await onUpdate([...without, { name: GOLD_STANDARD_MARKER, url: file_url }]);
     } catch (err) {
       console.error("Gold standard upload failed:", err);
     }
@@ -253,29 +260,21 @@ function GoldStandardUpload({ prompt, onSaved }) {
   };
 
   const handleRemove = async () => {
-    setRemoving(true);
-    await base44.entities.Prompt.update(prompt.id, { gold_standard_url: null });
-    setLocalUrl(null);
-    onSaved();
-    setRemoving(false);
+    await onUpdate(attachedFiles.filter(f => f.name !== GOLD_STANDARD_MARKER));
   };
 
-  if (activeUrl) {
+  if (goldEntry) {
     return (
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 border border-green-200 rounded-md text-xs text-green-700">
           <Paperclip className="w-3 h-3" />
-          <a href={activeUrl} target="_blank" rel="noreferrer" className="hover:underline">
-            Gold standard attached
-          </a>
+          <a href={goldEntry.url} target="_blank" rel="noreferrer" className="hover:underline">Gold standard attached</a>
         </div>
         <button
           onClick={handleRemove}
-          disabled={removing}
           className="text-xs text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1"
         >
-          {removing ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
-          Remove
+          <X className="w-3 h-3" /> Remove
         </button>
       </div>
     );

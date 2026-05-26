@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Prompt text is empty' }, { status: 400 });
     }
 
-    const attachedFiles = prompt.attached_files || [];
+    const attachedFiles = (prompt.attached_files || []).filter((f: any) => f.name !== '__gold_standard__');
 
     const rubrics = await base44.asServiceRole.entities.Rubric.filter({ prompt_id: prompt.id });
     const rubric = rubrics[0];
@@ -76,16 +76,16 @@ Deno.serve(async (req) => {
     const criteria = await base44.asServiceRole.entities.RubricCriterion.filter({ rubric_id: rubric.id });
     if (criteria.length === 0) throw new Error('No criteria defined');
 
-    // Load gold standard if attached to the prompt
+    // Gold standard stored as special entry in attached_files
+    const GOLD_MARKER = '__gold_standard__';
     let goldStandardText = '';
     try {
-      if (prompt.gold_standard_url) {
-        const goldRes = await fetch(prompt.gold_standard_url);
+      const goldEntry = (prompt.attached_files || []).find((f: any) => f.name === GOLD_MARKER);
+      if (goldEntry?.url) {
+        const goldRes = await fetch(goldEntry.url);
         goldStandardText = await goldRes.text();
       }
-    } catch (_) {
-      // Gold standard is optional — continue without it
-    }
+    } catch (_) {}
 
     const totalWeight = criteria.reduce((sum, c) => sum + (c.weight || 0), 0);
     const normalizedWeights = {};
