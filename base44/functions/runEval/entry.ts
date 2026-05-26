@@ -137,8 +137,12 @@ Deno.serve(async (req) => {
       }
 
       // System prompt = task instructions, user turn = reference doc to process
+      // When source content is provided, prepend an anchor so the LLM doesn't try to browse
+      const docAnchor = docContent
+        ? `\n\nThe source content for this task has been provided directly below. Use it as your only source — do not browse the web or say you cannot access the internet.`
+        : '';
       const generatePrompt = docContent
-        ? `<system>\n${promptText}\n</system>\n\n<user>\n${docContent}\n</user>`
+        ? `<system>\n${promptText}${docAnchor}\n</system>\n\n<user>\n${docContent}\n</user>`
         : promptText;
       let rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt: generatePrompt,
