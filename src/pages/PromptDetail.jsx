@@ -231,15 +231,23 @@ export default function PromptDetail() {
 function GoldStandardUpload({ prompt, onSaved }) {
   const [uploading, setUploading] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [localUrl, setLocalUrl] = useState(null);
   const fileInputRef = useRef(null);
+
+  const activeUrl = localUrl ?? prompt?.gold_standard_url;
 
   const handleUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    await base44.entities.Prompt.update(prompt.id, { gold_standard_url: file_url });
-    onSaved();
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      await base44.entities.Prompt.update(prompt.id, { gold_standard_url: file_url });
+      setLocalUrl(file_url);
+      onSaved();
+    } catch (err) {
+      console.error("Gold standard upload failed:", err);
+    }
     setUploading(false);
     e.target.value = "";
   };
@@ -247,16 +255,17 @@ function GoldStandardUpload({ prompt, onSaved }) {
   const handleRemove = async () => {
     setRemoving(true);
     await base44.entities.Prompt.update(prompt.id, { gold_standard_url: null });
+    setLocalUrl(null);
     onSaved();
     setRemoving(false);
   };
 
-  if (prompt?.gold_standard_url) {
+  if (activeUrl) {
     return (
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 border border-green-200 rounded-md text-xs text-green-700">
           <Paperclip className="w-3 h-3" />
-          <a href={prompt.gold_standard_url} target="_blank" rel="noreferrer" className="hover:underline">
+          <a href={activeUrl} target="_blank" rel="noreferrer" className="hover:underline">
             Gold standard attached
           </a>
         </div>
