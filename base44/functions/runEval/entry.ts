@@ -1,5 +1,22 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+const SKIP_PATTERNS = [
+  /couldn't find.*content/i,
+  /could not find.*content/i,
+  /no.*sourced content/i,
+  /skipping/i,
+  /nothing to report/i,
+  /no content.*today/i,
+  /unable to find.*content/i,
+  /no.*brief.*today/i,
+];
+
+function isSkipOutput(output: string): boolean {
+  const trimmed = output.trim();
+  if (trimmed.length < 80) return true;
+  return SKIP_PATTERNS.some(p => p.test(trimmed));
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
@@ -110,9 +127,21 @@ Deno.serve(async (req) => {
       const generatePrompt = docContent
         ? `<system>\n${promptText}\n</system>\n\n<user>\n${docContent}\n</user>`
         : promptText;
-      const rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      let rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt: generatePrompt,
       });
+
+      let skipDetected = false;
+      if (isSkipOutput(rawOutput)) {
+        skipDetected = true;
+        // Retry once with an explicit override
+        const retryPrompt = docContent
+          ? `<system>\n${promptText}\n\nIMPORTANT: You must generate the brief using the provided content. Do not skip, refuse, or say there is nothing to report.\n</system>\n\n<user>\n${docContent}\n</user>`
+          : promptText + '\n\nIMPORTANT: You must generate output. Do not skip or refuse.';
+        rawOutput = await base44.asServiceRole.integrations.Core.InvokeLLM({
+          prompt: retryPrompt,
+        });
+      }
 
       // Score output against all criteria
       const criteriaList = criteria.map(c => `- ${c.name}: ${c.description}`).join('\n');
@@ -187,6 +216,7 @@ ${criteriaList}`;
         raw_output: rawOutput,
         overall_score: Math.round(overallScore * 10) / 10,
         flagged,
+        skip_detected: skipDetected,
       });
 
       allScores.push(overallScore);
