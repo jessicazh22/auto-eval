@@ -46,6 +46,10 @@ export default function GenerateRubric() {
   const [generatedCriteria, setGeneratedCriteria] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [hasExistingRubric, setHasExistingRubric] = useState(false);
+  const [noSavedInputs, setNoSavedInputs] = useState(false);
+  const [importJson, setImportJson] = useState("");
+  const [importError, setImportError] = useState("");
 
   const { data: prompts = [] } = useQuery({
     queryKey: ["prompts"],
@@ -60,7 +64,40 @@ export default function GenerateRubric() {
     if (!promptId) return;
     const rubrics = await base44.entities.Rubric.filter({ prompt_id: promptId });
     const rubric = rubrics[0];
-    if (!rubric?.annotation_text) return;
+    setHasExistingRubric(!!rubric);
+    setNoSavedInputs(false);
+    if (!rubric?.annotation_text) {
+      if (rubric) {
+        // Auto-seed annotations for this prompt then reload
+        const prompt = prompts.find(p => p.id === promptId);
+        if (prompt) {
+          await base44.functions.invoke("seedAnnotations", { prompt_name: prompt.name }).catch(() => {});
+          // Re-fetch rubric with seeded data
+          const fresh = await base44.entities.Rubric.filter({ prompt_id: promptId });
+          if (fresh[0]?.annotation_text) {
+            const saved = JSON.parse(fresh[0].annotation_text);
+            if (saved.__version === 2) {
+              setActiveTab(saved.mode || "examples");
+              if (saved.mode === "general") {
+                setCommonFailure(saved.general?.commonFailure || "");
+                setSuccessDescription(saved.general?.successDescription || "");
+                setFeedbackText(saved.general?.feedbackText || "");
+              } else {
+                const restored = (saved.examples || []).map((e) => ({
+                  text: e.fileUrl ? "" : e.text || "",
+                  file: e.fileUrl ? { name: e.fileName, url: e.fileUrl } : null,
+                  annotation: e.annotation || "",
+                }));
+                setExamples(restored.length > 0 ? restored : [{ text: "", file: null, annotation: "" }]);
+                setCommonFailure(saved.general?.commonFailure || "");
+                setSuccessDescription(saved.general?.successDescription || "");
+              }
+            }
+          }
+        }
+      }
+      return;
+    }
     try {
       const saved = JSON.parse(rubric.annotation_text);
       if (saved.__version === 2) {
@@ -76,6 +113,9 @@ export default function GenerateRubric() {
             annotation: e.annotation || "",
           }));
           setExamples(restored.length > 0 ? restored : [{ text: "", file: null, annotation: "" }]);
+          // Also restore general context even in examples mode
+          setCommonFailure(saved.general?.commonFailure || "");
+          setSuccessDescription(saved.general?.successDescription || "");
         }
         return;
       }
