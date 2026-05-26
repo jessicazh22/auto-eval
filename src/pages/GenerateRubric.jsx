@@ -166,30 +166,36 @@ export default function GenerateRubric() {
   );
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8">
+    <div className="px-12 py-14 max-w-[860px] mx-auto space-y-8">
       <button
         onClick={() => navigate("/")}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className="inline-flex items-center gap-1.5 text-[14px] text-[#777169] hover:text-[#0c0a09] transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to prompts
       </button>
 
       <div>
-        <h1 className="text-2xl font-semibold">Generate Rubric</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-[12px] uppercase font-bold text-[#a8a29e] tracking-[0.1em] mb-2">Rubric Builder</p>
+        <h1
+          className="text-[40px] text-[#0c0a09] leading-[1.1] tracking-tight mb-2"
+          style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+        >
+          Generate Rubric
+        </h1>
+        <p className="text-[16px] text-[#777169] leading-relaxed">
           Let AI generate evaluation criteria based on your inputs.
         </p>
       </div>
 
       {/* Prompt selector */}
-      <section className="space-y-2">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Prompt</label>
+      <section className="space-y-3">
+        <label className="block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#a8a29e]">Prompt</label>
         <Select
           value={selectedPromptId}
           onValueChange={handlePromptChange}
         >
-          <SelectTrigger className="w-full max-w-sm">
+          <SelectTrigger className="w-72 bg-white border-[#e7e5e4] rounded-xl text-[15px] text-[#292524] font-medium">
             <SelectValue placeholder="Select a prompt..." />
           </SelectTrigger>
           <SelectContent>

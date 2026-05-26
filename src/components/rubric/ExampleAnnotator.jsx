@@ -60,13 +60,24 @@ function ExampleSplitView({ example, onChange, fileInputRef, uploading, isImage,
         <div className="px-4 py-2.5 border-b border-border bg-muted/20 shrink-0">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Your Comments</p>
         </div>
-        <div className="flex-1 p-4">
+        <div className="flex-1 p-4 overflow-auto flex flex-col gap-4">
           <Textarea
             value={example.annotation || ""}
             onChange={(e) => onChange({ ...example, annotation: e.target.value })}
             placeholder="What's good or bad about this output? Be specific — e.g. 'tone is too formal', 'missing the key point about X', 'formatting is perfect'..."
-            className="text-sm resize-none w-full h-full min-h-[320px] border-0 focus-visible:ring-0 shadow-none p-0"
+            className="text-sm resize-none w-full flex-1 min-h-[160px] border-0 focus-visible:ring-0 shadow-none p-0"
           />
+          <div className="rounded-xl border border-[#e7e5e4] bg-[#fafafa] px-4 py-4 shrink-0">
+            <p className="text-xs font-semibold text-[#292524] mb-3">Tips for good annotations</p>
+            <ul className="space-y-2">
+              {ANNOTATION_TIPS.map((tip, i) => (
+                <li key={i} className="text-xs text-[#777169] flex gap-2">
+                  <span className="text-green-600 shrink-0">✓</span>
+                  <span>{tip.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     </div>
@@ -181,12 +192,10 @@ const ANNOTATION_TIPS = [
   { text: 'Name the specific failure — "Uses jargon I don\'t know" not just "confusing"' },
   { text: 'Quote the sentence that lost you — "I stopped reading at \'cost-base indexation\'"' },
   { text: 'Separate issues — comprehension, relevance, and length are different problems' },
-  { text: 'Include a good example too — note what worked and why, e.g. "I trust this because the source is named"' },
+  { text: 'Include a good example too — note what worked, e.g. "I trust this because the source is named"' },
 ];
 
 export default function ExampleAnnotator({ examples, onChange }) {
-  const [showTips, setShowTips] = useState(false);
-
   const addExample = () => {
     onChange([...examples, { text: "", file: null, annotation: "" }]);
   };
@@ -201,32 +210,17 @@ export default function ExampleAnnotator({ examples, onChange }) {
 
   return (
     <div className="space-y-3">
-      {/* Annotation guidance */}
-      <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5 space-y-1.5">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-medium text-muted-foreground">How to write good annotations</p>
-          <button
-            onClick={() => setShowTips(t => !t)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {showTips ? "Hide" : "Show tips"}
-          </button>
-        </div>
-        {showTips && (
-          <ul className="space-y-1">
-            {ANNOTATION_TIPS.map((tip, i) => (
-              <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
-                <span className="text-green-600 shrink-0">✓</span>
-                <span>{tip.text}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {!showTips && (
-          <p className="text-xs text-muted-foreground italic">
-            Tip: quote the specific sentence that failed — e.g. "I stopped reading at 'cost-base indexation'"
-          </p>
-        )}
+      {/* Annotation tips — always visible */}
+      <div className="rounded-xl border border-[#e7e5e4] bg-[#fafafa] px-4 py-4">
+        <p className="text-xs font-semibold text-[#292524] mb-3">Tips for good annotations</p>
+        <ul className="space-y-2">
+          {ANNOTATION_TIPS.map((tip, i) => (
+            <li key={i} className="text-xs text-[#777169] flex gap-2">
+              <span className="text-green-600 shrink-0">✓</span>
+              <span>{tip.text}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       {examples.map((ex, i) => (
