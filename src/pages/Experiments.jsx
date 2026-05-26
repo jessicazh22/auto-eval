@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -86,12 +86,30 @@ export default function Experiments() {
   );
 }
 
+function usePromptDiff(originalUrl, improvedUrl) {
+  const [diff, setDiff] = useState(null);
+  useEffect(() => {
+    if (!originalUrl || !improvedUrl) return;
+    const resolve = url => url.startsWith("http") ? fetch(url).then(r => r.text()) : Promise.resolve(url);
+    Promise.all([resolve(originalUrl), resolve(improvedUrl)]).then(([orig, impr]) => {
+      const split = t => t.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+      const origSentences = split(orig);
+      const impSentences = split(impr);
+      const added = impSentences.filter(s => !origSentences.includes(s)).join(" ").trim();
+      const removed = origSentences.filter(s => !impSentences.includes(s)).join(" ").trim();
+      setDiff({ added, removed });
+    }).catch(() => {});
+  }, [originalUrl, improvedUrl]);
+  return diff;
+}
+
 function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, onDeleted }) {
   const delta = variant.score_delta;
   const isRunning = variant.status === "running" || variant.status === "generating";
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
+  const diff = usePromptDiff(variant.original_prompt_text, variant.improved_prompt_text);
 
   async function handleApply() {
     if (!window.confirm("Apply this variant as the new prompt? This will update the live prompt text.")) return;
@@ -159,12 +177,19 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
             </div>
           )}
           <p className="text-sm leading-relaxed">
-            If I{" "}
-            <span className="font-medium">"{variant.change_summary}"</span>
-            {variant.target_criterion && (
+            {diff?.added ? (
+              <>If I add <span className="font-medium">"{diff.added}"</span></>
+            ) : diff?.removed ? (
+              <>If I remove <span className="font-medium">"{diff.removed}"</span></>
+            ) : diff ? (
+              <>If I apply this change</>
+            ) : (
+              <span className="text-muted-foreground italic text-xs">Loading diff…</span>
+            )}
+            {(diff?.added || diff?.removed || diff) && variant.target_criterion && (
               <>, it should improve <span className="font-medium text-amber-700">"{variant.target_criterion}"</span></>
             )}
-            {variant.why_this_helps && (
+            {(diff?.added || diff?.removed || diff) && variant.why_this_helps && (
               <> because {variant.why_this_helps}</>
             )}
           </p>
