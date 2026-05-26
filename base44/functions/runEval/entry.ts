@@ -26,7 +26,9 @@ const SKIP_PATTERNS = [
 
 function isSkipOutput(output: string): boolean {
   const trimmed = output.trim();
-  if (trimmed.length < 80) return true;
+  // Too short — fewer than 3 paragraph breaks or under 400 chars is almost certainly a refusal or stub
+  const paragraphs = trimmed.split(/\n\n+/).filter(p => p.trim().length > 0);
+  if (trimmed.length < 400 || paragraphs.length < 3) return true;
   return SKIP_PATTERNS.some(p => p.test(trimmed));
 }
 
