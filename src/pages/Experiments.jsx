@@ -320,12 +320,6 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
                     View results
                   </button>
                 )}
-                <button
-                  onClick={handleCopy}
-                  className="text-[13px] font-medium px-4 py-1.5 rounded-full border border-[#e7e5e4] hover:border-[#d6d3d1] text-[#292524] transition-all"
-                >
-                  {copied ? "Copied!" : "Copy prompt"}
-                </button>
               </div>
             </>
           ) : variant.status === "failed" ? (
