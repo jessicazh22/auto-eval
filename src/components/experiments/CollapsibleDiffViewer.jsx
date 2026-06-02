@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
 
 function computeDiff(original, improved) {
   const origWords = original.split(/(\s+)/);
@@ -41,6 +41,15 @@ export default function CollapsibleDiffViewer({ originalUrl, improvedUrl }) {
   const [expanded, setExpanded] = useState(false);
   const [original, setOriginal] = useState(null);
   const [improved, setImproved] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy(e) {
+    e.stopPropagation();
+    if (!improved) return;
+    await navigator.clipboard.writeText(improved);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   useEffect(() => {
     if (original && improved) return;
@@ -79,7 +88,12 @@ export default function CollapsibleDiffViewer({ originalUrl, improvedUrl }) {
             </p>
           </div>
           <div className="p-4 bg-green-50/40">
-            <p className="text-xs font-semibold text-green-700 mb-2 uppercase tracking-wider font-sans">After</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-green-700 uppercase tracking-wider font-sans">After</p>
+              <button onClick={handleCopy} className="text-green-600 hover:text-green-800 transition-colors" title="Copy improved prompt">
+                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+            </div>
             <p className="whitespace-pre-wrap leading-relaxed">
               {diff.addedParts.map((part, i) =>
                 part.type === "added"
