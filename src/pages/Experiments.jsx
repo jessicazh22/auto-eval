@@ -174,6 +174,22 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      let text = variant.improved_prompt_text || "";
+      if (text.startsWith("http")) {
+        const res = await fetch(text);
+        text = await res.text();
+      }
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Copy failed:", err);
+    }
+  }
 
   async function handleApply() {
     if (!window.confirm("Apply this variant as the new prompt? This will update the live prompt text.")) return;
@@ -304,6 +320,12 @@ function VariantCard({ variant, promptName, onViewPrompt, onViewRun, onApplied, 
                     View results
                   </button>
                 )}
+                <button
+                  onClick={handleCopy}
+                  className="text-[13px] font-medium px-4 py-1.5 rounded-full border border-[#e7e5e4] hover:border-[#d6d3d1] text-[#292524] transition-all"
+                >
+                  {copied ? "Copied!" : "Copy prompt"}
+                </button>
               </div>
             </>
           ) : variant.status === "failed" ? (
