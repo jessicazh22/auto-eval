@@ -1,37 +1,48 @@
-**Welcome to your Base44 project** 
+# EvalLoop
 
-**About**
+Iterative prompt evaluation — run structured evals, surface weaknesses, and test targeted improvements.
 
-This project contains everything you need to run your app locally.
+## Overview
 
-**Edit the code in your local development environment**
+EvalLoop closes the loop between running an LLM prompt and improving it. Define a rubric, run evals against test inputs, and let the system generate hypothesis-driven prompt variants targeting your weakest criterion.
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
+## Features
 
-**Prerequisites:** 
+- **Rubric-based scoring** — define named criteria, each scored 0–10, with a configurable passing threshold
+- **Eval runs** — score a prompt against all test inputs; surfaces composite score and weakest criterion
+- **Auto-improvement** — generates 3 variant prompts in parallel (rule / example / restructure strategies) targeting the weakest criterion
+- **Variant approval** — preview sample output per variant before committing to a full eval
+- **Score tracking** — criterion-by-criterion before/after comparison across runs
 
-1. Clone the repository using the project's Git URL 
-2. Navigate to the project directory
-3. Install dependencies: `npm install`
-4. Create an `.env.local` file and set the right environment variables
+## Stack
+
+- **Frontend** — React, React Query, Tailwind CSS, shadcn/ui
+- **Backend** — base44 (entities + serverless functions)
+- **Eval engine** — Deno/TypeScript + Claude API
+
+## Getting Started
+
+```bash
+npm install
+npm run dev
+```
+
+Set `VITE_BASE44_APP_ID` to your base44 app ID. Authentication is managed by base44.
+
+## Project Structure
 
 ```
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=your_backend_url
-
-e.g.
-VITE_BASE44_APP_ID=cbef744a8545c389ef439ea6
-VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
+src/
+  pages/          # Home, PromptDetail, EvalRunDetail, Experiments
+  components/
+    variant/      # CriterionComparison, DiagnosisBlock
+    prompt/       # EvalRunsTable, RunEvalModal
+    shared/       # ScoreBadge, StatusBadge
+base44/
+  entities/       # Prompt, EvalRun, PromptVariant, Rubric, ...
+  functions/      # improvePrompt, runEval
 ```
 
-Run the app: `npm run dev`
+## License
 
-**Publish your changes**
-
-Open [Base44.com](http://Base44.com) and click on Publish.
-
-**Docs & Support**
-
-Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
-
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+MIT
